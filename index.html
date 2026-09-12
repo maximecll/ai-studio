@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="fr" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Studio — Ollama</title>
+    <meta name="description" content="Interface privée pour discuter avec vos modèles Ollama locaux." />
+    <script>
+      // Applique le thème avant le premier paint : pas de flash blanc au chargement.
+      (() => {
+        const t = localStorage.getItem('studio.theme') ?? 'system'
+        const dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.classList.toggle('dark', dark)
+        // Peint la couleur de base avant le CSS : aucun flash au démarrage.
+        document.documentElement.style.backgroundColor = dark ? '#0c090a' : '#fefefa'
+        const f = localStorage.getItem('studio.font')
+        if (f) document.documentElement.style.setProperty('--ui-font', { dm: "'DM Sans'", satoshi: "'Satoshi'", inter: "'Inter'" }[f] || "'DM Sans'")
+      })()
+    </script>
+  </head>
+  <body class="h-full">
+    <div id="root" class="h-full"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

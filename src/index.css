@@ -1,0 +1,287 @@
+@import 'tailwindcss';
+@import './fonts.css';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ═══════════════════════════════════════════════════════════════════
+   Direction visuelle — « Atelier »
+   Papier chaud, encre profonde, un seul accent indigo.
+
+   Règles non négociables :
+   · 3 rayons     — pilule (actions) · 18px (cartes) · 10px (lignes)
+   · 3 graisses   — 400 texte · 500 interface · 700 titres
+   · 8 tailles    — 32 · 22 · 17 · 15 · 14 · 13 · 12 · 11
+   · 3 chromas    — accent (interactif) · positif (statut) · négatif (erreur)
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Base imposée — tout le châssis porte cette couleur, sans exception */
+  --base: #fefefa;
+
+  /* Rampe neutre chaude dérivée de la base */
+  --card: #ffffff;
+  --raised: #f5f5ef;
+  --sunken: #ecece5;
+  --line: #e7e7df;
+  --line-strong: #d9d9cf;
+  --code-inline: #a8352b;
+  --ink: #16150f;
+  --ink-muted: #6c6a60;
+  --ink-subtle: #9b9a90;
+
+  --bg: var(--base);
+  --surface: var(--card);
+  --surface-2: var(--raised);
+  --surface-3: var(--sunken);
+  /* En-têtes et barres latérales : strictement la couleur de base */
+  --nav: var(--base);
+  --fg: var(--ink);
+  --fg-muted: var(--ink-muted);
+  --fg-subtle: var(--ink-subtle);
+
+  /* Accent unique, employé avec parcimonie : actif, lien, focus, curseur vivant */
+  --accent: #3a6df0;
+  --accent-hover: #3560d8;
+  --accent-fg: #ffffff;
+  --accent-ink: #3560d8;
+  --accent-wash: #ecf1fe;
+  --accent-ring: rgba(58, 109, 240, 0.18);
+
+  /* Action principale : l'encre, jamais la couleur */
+  --solid: #16150f;
+  --solid-hover: #2b2a22;
+  --solid-fg: #fefefa;
+
+  /* Statut — un vert, un rouge, une ambre. Rien d'autre. */
+  --positive: #1f7a52;
+  --positive-wash: #e9f3ed;
+  --negative: #b3261e;
+  --negative-wash: #fbecea;
+  --caution: #8a5a00;
+  --caution-wash: #fbf2df;
+
+  --lift-card: 0 1px 2px rgba(22, 21, 15, 0.04), 0 0 0 1px rgba(22, 21, 15, 0.07);
+  --lift-float: 0 1px 2px rgba(22, 21, 15, 0.06), 0 12px 32px -8px rgba(22, 21, 15, 0.16), 0 0 0 1px rgba(22, 21, 15, 0.08);
+
+  color-scheme: light;
+}
+
+/* Le sombre n'est pas un thème parallèle : mêmes rôles, même hiérarchie,
+   même distance entre chaque plan. */
+.dark {
+  --base: #0c090a;
+
+  --bg: var(--base);
+  --surface: #141011;
+  --surface-2: #1b1617;
+  --surface-3: #241e1f;
+  /* En-têtes et barres latérales : strictement la couleur de base */
+  --nav: var(--base);
+  --line: #201a1b;
+  --line-strong: #2c2425;
+  --code-inline: #f08d81;
+  --fg: #f2f0ec;
+  --fg-muted: #9b958f;
+  --fg-subtle: #6d6863;
+
+  --accent: #7ba2ff;
+  --accent-hover: #96b6ff;
+  --accent-fg: #0c090a;
+  --accent-ink: #9bbaff;
+  --accent-wash: #161a26;
+  --accent-ring: rgba(123, 162, 255, 0.26);
+
+  --solid: #f2f0ec;
+  --solid-hover: #ffffff;
+  --solid-fg: #0c090a;
+
+  --positive: #4fb383;
+  --positive-wash: #12211a;
+  --negative: #f0665c;
+  --negative-wash: #261615;
+  --caution: #d9a14f;
+  --caution-wash: #261d12;
+
+  --lift-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.055);
+  --lift-float: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 32px -8px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.075);
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-nav: var(--nav);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-wash: var(--accent-wash);
+
+  --color-solid: var(--solid);
+  --color-solid-hover: var(--solid-hover);
+  --color-solid-fg: var(--solid-fg);
+
+  --color-positive: var(--positive);
+  --color-positive-wash: var(--positive-wash);
+  --color-negative: var(--negative);
+  --color-negative-wash: var(--negative-wash);
+  --color-caution: var(--caution);
+  --color-caution-wash: var(--caution-wash);
+
+  --font-sans: var(--ui-font, 'DM Sans'), 'Satoshi', 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Deux rayons nommés ; tout le reste est une pilule. */
+  --radius-sm: 10px;
+  --radius-lg: 18px;
+
+  --shadow-card: var(--lift-card);
+  --shadow-float: var(--lift-float);
+
+  --animate-rise: rise 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-caret: caret 1.1s steps(2, start) infinite;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes caret { 50% { opacity: 0; } }
+
+/* ── Base ────────────────────────────────────────────────────────── */
+@layer base {
+  * { border-color: var(--line); }
+
+  body {
+    background-color: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.6;
+    /* Aucune graisse fine : 500 pour tout le texte, 700 pour les titres. */
+    font-weight: 500;
+    letter-spacing: -0.011em;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overscroll-behavior: none;
+  }
+
+  ::selection { background: var(--accent-wash); color: var(--fg); }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 10px; }
+
+  input, textarea, button, select { font: inherit; letter-spacing: inherit; }
+  textarea { field-sizing: content; }
+
+  .scroll-thin { scrollbar-width: thin; scrollbar-color: transparent transparent; transition: scrollbar-color 0.2s; }
+  .scroll-thin:hover { scrollbar-color: var(--line-strong) transparent; }
+  .scroll-thin::-webkit-scrollbar { width: 10px; height: 10px; }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background: transparent; border-radius: 99px; border: 3px solid transparent; background-clip: content-box;
+  }
+  .scroll-thin:hover::-webkit-scrollbar-thumb { background: var(--line-strong); background-clip: content-box; }
+  .scroll-thin::-webkit-scrollbar-track { background: transparent; }
+}
+
+/* ── Échelle typographique — la seule autorisée ──────────────────── */
+/* Le suivi se resserre à mesure que la taille grandit, par pas réguliers. */
+.t-display { font-size: 32px; line-height: 1.18; letter-spacing: -0.030em; font-weight: 700; }
+.t-title   { font-size: 22px; line-height: 1.32; letter-spacing: -0.022em; font-weight: 700; }
+.t-section { font-size: 17px; line-height: 1.42; letter-spacing: -0.016em; font-weight: 700; }
+.t-body    { font-size: 15px; line-height: 1.62; letter-spacing: -0.011em; font-weight: 500; }
+.t-ui      { font-size: 14px; line-height: 1.45; letter-spacing: -0.009em; font-weight: 500; }
+.t-meta    { font-size: 13px; line-height: 1.46; letter-spacing: -0.006em; font-weight: 500; }
+.t-caption { font-size: 12px; line-height: 1.42; letter-spacing: -0.003em; font-weight: 500; }
+.t-label   { font-size: 11px; line-height: 1.4;  letter-spacing: 0.09em; font-weight: 700; text-transform: uppercase; }
+
+/* ── Markdown — de la prose, pas du chrome ───────────────────────── */
+.md { font-size: 15px; line-height: 1.68; letter-spacing: -0.011em; font-weight: 500; overflow-wrap: anywhere; }
+.md > * + * { margin-top: 14px; }
+.md h1, .md h2, .md h3, .md h4 { font-weight: 700; line-height: 1.35; letter-spacing: -0.02em; }
+.md h1 { font-size: 22px; margin-top: 28px; }
+.md h2 { font-size: 17px; margin-top: 28px; }
+.md h3 { font-size: 15px; margin-top: 24px; }
+.md h4 { font-size: 15px; margin-top: 20px; color: var(--fg-muted); }
+.md ul, .md ol { padding-left: 22px; }
+.md ul { list-style: disc; }
+.md ol { list-style: decimal; }
+.md li + li { margin-top: 5px; }
+.md li::marker { color: var(--fg-subtle); }
+.md a { color: var(--accent-ink); font-weight: 700; text-decoration: none; }
+.md a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.md strong { font-weight: 700; }
+.md blockquote { border-left: 2px solid var(--line-strong); padding-left: 14px; color: var(--fg-muted); }
+.md hr { border: none; border-top: 1px solid var(--line); margin: 28px 0; }
+.md code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--code-inline);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  padding: 1px 5px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.md a code { color: inherit; }
+.md pre { margin: 0; }
+.md pre code {
+  display: block;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-weight: 500;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre;
+}
+.md table { width: 100%; min-width: max-content; border-collapse: collapse; font-size: 13px; }
+.md th, .md td { border-bottom: 1px solid var(--line); padding: 9px 14px; text-align: left; vertical-align: top; }
+.md thead th {
+  font-size: 12px; font-weight: 700; color: var(--fg-muted);
+  background: var(--surface-2); white-space: nowrap;
+}
+.md tbody tr:last-child td { border-bottom: none; }
+.md tbody tr:hover { background: color-mix(in srgb, var(--fg) 2.5%, transparent); }
+.md td code { white-space: nowrap; }
+.md img { border-radius: 18px; }
+
+/* ── Coloration syntaxique — dérivée de la palette, jamais criarde ─ */
+.hljs-comment, .hljs-quote { color: var(--fg-subtle); font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-type { color: var(--accent-ink); font-weight: 700; }
+.hljs-string, .hljs-regexp, .hljs-addition { color: var(--positive); }
+.hljs-number, .hljs-built_in, .hljs-symbol { color: var(--caution); }
+.hljs-title, .hljs-section { color: var(--fg); font-weight: 700; }
+.hljs-attr, .hljs-attribute, .hljs-variable, .hljs-template-variable { color: var(--fg-muted); }
+.hljs-meta, .hljs-doctag { color: var(--fg-subtle); }
+.hljs-deletion { color: var(--negative); }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 700; }
+
+/* ── Curseurs ────────────────────────────────────────────────────── */
+.slider-input { -webkit-appearance: none; appearance: none; width: 100%; height: 18px; background: transparent; cursor: pointer; }
+.slider-input::-webkit-slider-runnable-track {
+  height: 3px; border-radius: 99px;
+  background: linear-gradient(to right, var(--accent) 0%, var(--accent) var(--pct), var(--line-strong) var(--pct), var(--line-strong) 100%);
+}
+.slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; margin-top: -5.5px; border-radius: 99px;
+  background: var(--surface); border: 1.5px solid var(--accent);
+  box-shadow: var(--lift-card); transition: transform 0.15s ease;
+}
+.slider-input:hover::-webkit-slider-thumb { transform: scale(1.15); }
+.slider-input::-moz-range-track { height: 3px; border-radius: 99px; background: var(--line-strong); }
+.slider-input::-moz-range-progress { height: 3px; border-radius: 99px; background: var(--accent); }
+.slider-input::-moz-range-thumb { width: 12px; height: 12px; border: 1.5px solid var(--accent); border-radius: 99px; background: var(--surface); }

@@ -1,0 +1,14 @@
+# Dépendances
+node_modules/
+
+# Build
+dist/
+
+# Journaux et fichiers système
+*.log
+.DS_Store
+
+# Réglages locaux d'éditeur
+.vscode/
+.idea/
+tsconfig.tsbuildinfo

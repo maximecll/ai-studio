@@ -1,0 +1,239 @@
+import { useEffect, useRef, useState } from 'react'
+import { Brain, Check, ChevronDown, Circle, Paperclip, Send, Square } from 'lucide-react'
+import { updateConversation } from '../../lib/db'
+import { usePresets } from '../../lib/hooks'
+import type { Conversation, Settings } from '../../lib/types'
+import { cn, estimateTokens, formatNumber, modKey } from '../../lib/utils'
+import { prettyModel, suggestedContext } from '../../lib/ollama'
+import { PresetGlyph } from '../../lib/preset-icons'
+import { useModels } from '../../store/models'
+import { useUI } from '../../store/ui'
+import { Button, Chip, Menu, MenuItem, MenuLabel, MenuSeparator, MorphButton, Tooltip } from '../ui/primitives'
+import { href, navigate } from '../../lib/router'
+
+/** Sélecteur de modèle — placé là où l'on écrit, pas dans l'en-tête. */
+function ModelChip({ conv }: { conv: Conversation }) {
+  const models = useModels((s) => s.models)
+  const running = useModels((s) => s.running)
+  const loaded = (name: string) => running.some((r) => r.name === name)
+
+  return (
+    <Menu
+      side="top"
+      width="w-80"
+      trigger={({ open }) => (
+        <Chip as="span" active={open} className="min-w-0 max-w-[min(46vw,240px)]">
+          {loaded(conv.model) && <span className="size-1.5 shrink-0 rounded-full bg-positive" />}
+          <span className="truncate">
+            {conv.model ? prettyModel(conv.model) : <span className="text-fg-subtle">Choisir un modèle</span>}
+          </span>
+          <ChevronDown className="size-3.5 shrink-0 text-fg-subtle" />
+        </Chip>
+      )}
+    >
+      <MenuLabel>Modèle</MenuLabel>
+      {models.length === 0 && (
+        <p className="t-caption px-2.5 py-3 text-fg-muted">Aucun modèle installé.</p>
+      )}
+      {models.map((m) => (
+        <MenuItem
+          key={m.name}
+          active={m.name === conv.model}
+          icon={m.name === conv.model ? <Check className="size-4 text-fg" /> : null}
+          onClick={() => {
+            /* Un contexte hérité d'un autre modèle peut dépasser le maximum
+               du nouveau : on le ramène dans ses bornes. */
+            const max = m.details?.context_length ?? 8192
+            const current = conv.params.num_ctx ?? suggestedContext(m)
+            void updateConversation(conv.id, {
+              model: m.name,
+              params: { ...conv.params, num_ctx: Math.min(current, max) },
+            })
+          }}
+        >
+          <span className="flex items-center gap-2">
+            <span className="truncate">{prettyModel(m.name)}</span>
+            {m.details?.parameter_size && (
+              <span className="shrink-0 font-mono text-[11px] text-fg-subtle">{m.details.parameter_size}</span>
+            )}
+            {loaded(m.name) && <span className="size-1.5 shrink-0 rounded-full bg-positive" />}
+          </span>
+        </MenuItem>
+      ))}
+      <MenuSeparator />
+      <MenuItem onClick={() => navigate(href.models())}>Gérer les modèles…</MenuItem>
+    </Menu>
+  )
+}
+
+/** Sélecteur de preset — même capsule, même hauteur, même graisse. */
+function PresetChip({ conv }: { conv: Conversation }) {
+  const presets = usePresets()
+  const setPresetsOpen = useUI((s) => s.setPresetsOpen)
+  const current = presets.find((p) => p.id === conv.presetId)
+
+  return (
+    <Menu
+      side="top"
+      width="w-64"
+      trigger={({ open }) => (
+        <Chip as="span" active={open || !!current} className="min-w-0 shrink">
+          {current ? <PresetGlyph name={current.icon} className="size-3.5" /> : <Circle className="size-3.5" />}
+          <span className="max-w-28 truncate">{current?.name ?? 'Preset'}</span>
+          <ChevronDown className="size-3.5 shrink-0 text-fg-subtle" />
+        </Chip>
+      )}
+    >
+      <MenuLabel>Preset</MenuLabel>
+      <MenuItem
+        active={!conv.presetId}
+        icon={<Circle className="size-4" />}
+        onClick={() => void updateConversation(conv.id, { presetId: null })}
+      >
+        Aucun
+      </MenuItem>
+      {presets.map((p) => (
+        <MenuItem
+          key={p.id}
+          active={p.id === conv.presetId}
+          icon={<PresetGlyph name={p.icon} />}
+          onClick={() =>
+            void updateConversation(conv.id, {
+              presetId: p.id,
+              system: p.system,
+              params: { ...conv.params, ...p.params },
+              ...(p.model ? { model: p.model } : {}),
+            })
+          }
+        >
+          {p.name}
+        </MenuItem>
+      ))}
+      <MenuSeparator />
+      <MenuItem onClick={() => setPresetsOpen(true)}>Gérer les presets…</MenuItem>
+    </Menu>
+  )
+}
+
+export function Composer({
+  conversation, settings, streaming, ratio, hasMemory, onSend, onStop,
+}: {
+  conversation: Conversation
+  settings: Settings
+  streaming: boolean
+  /** Part du contexte occupée, calculée par la vue (mémoire comprise). */
+  ratio: number
+  hasMemory: boolean
+  onSend: (text: string) => void
+  onStop: () => void
+}) {
+  const [text, setText] = useState('')
+  const ref = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    setText(sessionStorage.getItem(`draft.${conversation.id}`) ?? '')
+    requestAnimationFrame(() => ref.current?.focus())
+  }, [conversation.id])
+
+  useEffect(() => {
+    if (text) sessionStorage.setItem(`draft.${conversation.id}`, text)
+    else sessionStorage.removeItem(`draft.${conversation.id}`)
+  }, [text, conversation.id])
+
+  const submit = () => {
+    const t = text.trim()
+    if (!t || streaming) return
+    setText('')
+    onSend(t)
+  }
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== 'Enter') return
+    const withMod = e.metaKey || e.ctrlKey
+    if (settings.sendOnEnter ? !e.shiftKey && !withMod : withMod) {
+      e.preventDefault()
+      submit()
+    }
+  }
+
+  const ctxMax = conversation.params.num_ctx ?? 4096
+  const used = Math.round(ratio * ctxMax) + estimateTokens(text)
+  const filled = Math.min(1, used / ctxMax)
+  const tight = filled > 0.8
+
+  return (
+    <div className="px-6 pt-2 pb-6">
+      <div className="mx-auto w-full max-w-[860px]">
+        <div
+          className={cn(
+            'rounded-lg bg-surface transition-shadow duration-200',
+            'shadow-card focus-within:shadow-float',
+          )}
+        >
+          <textarea
+            ref={ref}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={onKeyDown}
+            rows={1}
+            placeholder={streaming ? 'Génération en cours…' : 'Écrivez votre message…'}
+            className={cn(
+              'block max-h-[40vh] min-h-12 w-full resize-none bg-transparent px-5 pt-4 pb-1',
+              'text-[15px] leading-[1.6] text-fg outline-none scroll-thin placeholder:text-fg-subtle',
+            )}
+          />
+
+          {/* Barre de pilotage : modèle, preset, contexte, envoi — tout à la même hauteur. */}
+          {/* Groupe de gauche compressible, groupe de droite intouchable :
+              le bouton d'envoi reste dans la carte à toute largeur. */}
+          <div className="flex h-14 items-center gap-1.5 px-3">
+            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+              <ModelChip conv={conversation} />
+              <PresetChip conv={conversation} />
+              {hasMemory && (
+                <Tooltip label="Une mémoire résume les échanges anciens de cette conversation" side="top">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full text-fg-subtle">
+                    <Brain className="size-4" />
+                  </span>
+                </Tooltip>
+              )}
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2">
+              <Tooltip label="Les pièces jointes arrivent bientôt" side="top">
+                <Button size="icon-sm" disabled className="hidden sm:inline-flex"><Paperclip className="size-4" /></Button>
+              </Tooltip>
+
+              <Tooltip label={`Contexte : ${formatNumber(used)} / ${formatNumber(ctxMax)} jetons`} side="top">
+                <span className="hidden items-center gap-2 pr-1 sm:flex">
+                  <span className="h-1 w-10 overflow-hidden rounded-full bg-fg/[0.08]">
+                    <span
+                      className={cn('block h-full rounded-full transition-[width] duration-300', tight ? 'bg-caution' : 'bg-fg/35')}
+                      style={{ width: `${Math.max(3, filled * 100)}%` }}
+                    />
+                  </span>
+                  <span className={cn('w-7 font-mono text-[11px] tabular-nums', tight ? 'text-caution' : 'text-fg-subtle')}>
+                    {Math.round(filled * 100)}%
+                  </span>
+                </span>
+              </Tooltip>
+
+              {streaming ? (
+                <Button variant="soft" size="icon" onClick={onStop} title="Arrêter (Échap)" aria-label="Arrêter">
+                  <Square className="size-3 fill-current" />
+                </Button>
+              ) : (
+                <MorphButton
+                  idle={Send} hover={Check} variant="primary" size="icon"
+                  iconClassName="translate-x-px -translate-y-px"
+                  title={settings.sendOnEnter ? 'Envoyer (Entrée)' : `Envoyer (${modKey}+Entrée)`}
+                  disabled={!text.trim()} onClick={submit}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

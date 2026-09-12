@@ -1,0 +1,256 @@
+import { useEffect, useState } from 'react'
+import { ChevronRight, Dices, Info, RotateCcw, Save, X } from 'lucide-react'
+import { DEFAULT_PARAMS, patchSettings, updateConversation } from '../../lib/db'
+import type { Conversation, Params } from '../../lib/types'
+import { cn, formatBytes, formatNumber } from '../../lib/utils'
+import { estimateMemory, hasCapability, prettyModel } from '../../lib/ollama'
+import { findModel, useModels } from '../../store/models'
+import { toast, useUI } from '../../store/ui'
+import { Badge, Button, Field, Input, Slider, Switch, Textarea, Tooltip } from '../ui/primitives'
+import { SavePresetModal } from './SavePresetModal'
+
+/**
+ * Coût mémoire du contexte choisi. Le cache d'attention croît linéairement
+ * avec la fenêtre : c'est lui qui décide si le modèle tient sur le GPU.
+ */
+function MemoryHint({
+  weights, shape, numCtx,
+}: { weights: number; shape: Parameters<typeof estimateMemory>[1]; numCtx: number }) {
+  const est = estimateMemory(weights, shape, numCtx)
+  if (!est) return null
+  return (
+    <div className="rounded-sm bg-surface-2 px-3 py-2.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="t-caption text-fg-muted">Empreinte estimée</span>
+        <span className="font-mono text-[13px] font-bold tabular-nums text-fg">≈ {formatBytes(est.total)}</span>
+      </div>
+      <p className="t-caption mt-1 text-fg-subtle">
+        {formatBytes(est.weights)} de poids + {formatBytes(est.cache)} de cache d'attention.
+        Au-delà de la mémoire disponible, une partie bascule sur le processeur et la génération ralentit nettement.
+      </p>
+    </div>
+  )
+}
+
+function Section({
+  title, children, defaultOpen = true, hint,
+}: { title: string; children: React.ReactNode; defaultOpen?: boolean; hint?: string }) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <section className="border-b border-line last:border-0">
+      <button onClick={() => setOpen((o) => !o)} className="flex h-12 w-full items-center gap-2 px-5 text-left">
+        <ChevronRight size={14} className={cn('shrink-0 text-fg-subtle transition-transform duration-200', open && 'rotate-90')} />
+        <span className="t-label flex-1 text-fg-muted">{title}</span>
+        {hint && (
+          <Tooltip label={hint} side="left"><Info size={14} className="text-fg-subtle" /></Tooltip>
+        )}
+      </button>
+      {open && <div className="animate-fade-up space-y-5 px-5 pb-6">{children}</div>}
+    </section>
+  )
+}
+
+export function Inspector({ conv }: { conv: Conversation }) {
+  const toggleInspector = useUI((s) => s.toggleInspector)
+  const models = useModels((s) => s.models)
+  const model = findModel(models, conv.model)
+  const shape = useModels((s) => s.shapes[conv.model])
+  const loadShape = useModels((s) => s.loadShape)
+  const [savePreset, setSavePreset] = useState(false)
+
+  useEffect(() => { if (conv.model) void loadShape(conv.model) }, [conv.model, loadShape])
+
+  const p = conv.params
+  const set = (patch: Partial<Params>) =>
+    void updateConversation(conv.id, { params: { ...p, ...patch }, presetId: null })
+
+  const maxCtx = model?.details?.context_length ?? 32768
+  const ctxStep = maxCtx > 65536 ? 4096 : maxCtx > 16384 ? 1024 : 256
+
+  return (
+    <aside className="flex w-80 shrink-0 flex-col border-l border-line bg-nav">
+      <div className="flex h-16 shrink-0 items-center gap-1 border-b border-line px-5">
+        <h2 className="flex-1 text-[15px] font-bold tracking-[-0.02em]">Paramètres</h2>
+        <Tooltip label="Enregistrer comme preset">
+          <Button size="icon-sm" onClick={() => setSavePreset(true)}><Save size={16} /></Button>
+        </Tooltip>
+        <Tooltip label="Tout réinitialiser">
+          <Button
+            size="icon-sm"
+            onClick={() => void updateConversation(conv.id, { params: { ...DEFAULT_PARAMS }, presetId: null })}
+          >
+            <RotateCcw size={16} />
+          </Button>
+        </Tooltip>
+        <Button size="icon-sm" onClick={toggleInspector} aria-label="Fermer"><X size={16} /></Button>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto scroll-thin">
+        <Section title="Instructions système" hint="Message caché placé en tête de conversation. Définit le rôle et le ton du modèle.">
+          <Textarea
+            value={conv.system}
+            onChange={(e) => void updateConversation(conv.id, { system: e.target.value, presetId: null })}
+            placeholder="Tu es un assistant…"
+            rows={5}
+            className="min-h-28"
+          />
+        </Section>
+
+        <Section title="Échantillonnage">
+          <Slider
+            label="Température" value={p.temperature} defaultValue={0.8} min={0} max={2} step={0.05}
+            onChange={(v) => set({ temperature: v })} format={(v) => v.toFixed(2)}
+            hint="Basse = factuel et répétable. Haute = créatif et imprévisible."
+          />
+          <Slider
+            label="Top P" value={p.top_p} defaultValue={0.9} min={0.05} max={1} step={0.01}
+            onChange={(v) => set({ top_p: v })} format={(v) => v.toFixed(2)}
+            hint="Ne considère que les jetons cumulant cette probabilité."
+          />
+          <Slider
+            label="Top K" value={p.top_k} defaultValue={40} min={1} max={120} step={1}
+            onChange={(v) => set({ top_k: v })}
+            hint="Nombre de candidats retenus à chaque jeton."
+          />
+          <Slider
+            label="Min P" value={p.min_p} defaultValue={0} min={0} max={0.5} step={0.01}
+            onChange={(v) => set({ min_p: v })} format={(v) => v.toFixed(2)}
+            hint="Seuil relatif au meilleur candidat. 0 = désactivé."
+          />
+        </Section>
+
+        <Section title="Répétition">
+          <Slider
+            label="Pénalité de répétition" value={p.repeat_penalty} defaultValue={1.1} min={0.8} max={2} step={0.01}
+            onChange={(v) => set({ repeat_penalty: v })} format={(v) => v.toFixed(2)}
+            hint="Au-dessus de 1, décourage les redites."
+          />
+          <Slider
+            label="Fenêtre de répétition" value={p.repeat_last_n} defaultValue={64} min={-1} max={512} step={1}
+            onChange={(v) => set({ repeat_last_n: v })} format={(v) => (v === -1 ? 'contexte' : String(v))}
+            hint="Nombre de jetons récents surveillés. -1 = tout le contexte."
+          />
+        </Section>
+
+        <Section title="Contexte et longueur">
+          <Slider
+            label="Fenêtre de contexte" value={p.num_ctx} defaultValue={8192} min={512} max={maxCtx} step={ctxStep}
+            onChange={(v) => set({ num_ctx: v })} format={(v) => formatNumber(v)}
+            hint={`Maximum du modèle : ${formatNumber(maxCtx)} jetons.`}
+          />
+          <MemoryHint weights={model?.size ?? 0} shape={shape ?? null} numCtx={p.num_ctx ?? 8192} />
+          <Field label="Longueur maximale de réponse" hint="-1 pour laisser le modèle décider quand s'arrêter.">
+            <Input
+              type="number" min={-1} value={p.num_predict ?? -1}
+              onChange={(e) => set({ num_predict: Number(e.target.value) })}
+            />
+          </Field>
+        </Section>
+
+        <Section title="Avancé" defaultOpen={false}>
+          <Field
+            label="Graine (seed)"
+            hint="Une graine fixe rend les réponses reproductibles."
+            action={
+              <div className="flex items-center gap-2">
+                <Tooltip label="Graine aléatoire">
+                  <button onClick={() => set({ seed: Math.floor(Math.random() * 1e6) })} className="text-fg-subtle transition-colors hover:text-fg">
+                    <Dices size={14} />
+                  </button>
+                </Tooltip>
+                {p.seed !== undefined && (
+                  <button onClick={() => set({ seed: undefined })} className="text-[11px] font-medium text-fg-subtle hover:text-fg">
+                    réinit.
+                  </button>
+                )}
+              </div>
+            }
+          >
+            <Input
+              type="number" placeholder="aléatoire" value={p.seed ?? ''}
+              onChange={(e) => set({ seed: e.target.value === '' ? undefined : Number(e.target.value) })}
+            />
+          </Field>
+
+          <Field label="Séquences d'arrêt" hint="Séparées par des virgules. La génération s'arrête si l'une apparaît.">
+            <Input
+              placeholder="###, Fin, Utilisateur:"
+              defaultValue={(p.stop ?? []).join(', ')}
+              onBlur={(e) => {
+                const arr = e.target.value.split(',').map((s) => s.trim()).filter(Boolean)
+                set({ stop: arr.length ? arr : undefined })
+              }}
+            />
+          </Field>
+
+          <Slider
+            label="Mirostat" value={p.mirostat} defaultValue={0} min={0} max={2} step={1}
+            onChange={(v) => set({ mirostat: v as 0 | 1 | 2 })}
+            format={(v) => (v === 0 ? 'désactivé' : `v${v}`)}
+            hint="Contrôle adaptatif de la perplexité. Remplace température et top-p."
+          />
+          {(p.mirostat ?? 0) > 0 && (
+            <>
+              <Slider label="Mirostat τ" value={p.mirostat_tau} defaultValue={5} min={0} max={10} step={0.1}
+                onChange={(v) => set({ mirostat_tau: v })} format={(v) => v.toFixed(1)} />
+              <Slider label="Mirostat η" value={p.mirostat_eta} defaultValue={0.1} min={0.01} max={1} step={0.01}
+                onChange={(v) => set({ mirostat_eta: v })} format={(v) => v.toFixed(2)} />
+            </>
+          )}
+
+          {hasCapability(model, 'thinking') && (
+            <Switch
+              label="Mode réflexion"
+              hint="Le modèle raisonne avant de répondre. Plus lent, plus fiable."
+              checked={conv.think ?? true}
+              onChange={(v) => void updateConversation(conv.id, { think: v })}
+            />
+          )}
+        </Section>
+
+        <Section title="Modèle" defaultOpen={false}>
+          {model ? (
+            <>
+              <dl className="space-y-2.5 text-[13px]">
+                {([
+                  ['Nom', prettyModel(model.name)],
+                  ['Famille', model.details?.family ?? '—'],
+                  ['Paramètres', model.details?.parameter_size ?? '—'],
+                  ['Quantisation', model.details?.quantization_level ?? '—'],
+                  ['Contexte max', formatNumber(model.details?.context_length ?? 0)],
+                  ['Taille sur disque', formatBytes(model.size)],
+                ] as const).map(([k, v]) => (
+                  <div key={k} className="flex items-baseline justify-between gap-3">
+                    <dt className="shrink-0 text-fg-subtle">{k}</dt>
+                    <dd className="truncate text-right font-medium">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+              {!!model.capabilities?.length && (
+                <div className="flex flex-wrap gap-1.5">
+                  {model.capabilities.map((c) => <Badge key={c} variant="outline">{c}</Badge>)}
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-[13px] text-fg-subtle">Modèle introuvable dans Ollama.</p>
+          )}
+        </Section>
+
+        <div className="p-5">
+          <Button
+            variant="soft" size="sm" className="w-full"
+            onClick={async () => {
+              await patchSettings({ defaultParams: { ...p }, defaultSystem: conv.system, defaultModel: conv.model })
+              toast({ title: 'Réglages par défaut mis à jour', tone: 'success' })
+            }}
+          >
+            Définir comme valeurs par défaut
+          </Button>
+        </div>
+      </div>
+
+      <SavePresetModal open={savePreset} onClose={() => setSavePreset(false)} conv={conv} />
+    </aside>
+  )
+}
