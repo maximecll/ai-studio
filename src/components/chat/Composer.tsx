@@ -3,16 +3,18 @@ import { Brain, Check, ChevronDown, Circle, Paperclip, Send, Square } from 'luci
 import { updateConversation } from '../../lib/db'
 import { usePresets } from '../../lib/hooks'
 import type { Conversation, Settings } from '../../lib/types'
-import { cn, estimateTokens, formatNumber, modKey } from '../../lib/utils'
-import { prettyModel, suggestedContext } from '../../lib/ollama'
+import { cn, estimateTokens, formatCompact, formatNumber, modKey } from '../../lib/utils'
+import { prettyModel } from '../../lib/ollama'
 import { PresetGlyph } from '../../lib/preset-icons'
 import { useModels } from '../../store/models'
+import { useChat } from '../../store/chat'
 import { useUI } from '../../store/ui'
 import { Button, Chip, Menu, MenuItem, MenuLabel, MenuSeparator, MorphButton, Tooltip } from '../ui/primitives'
 import { href, navigate } from '../../lib/router'
 
 /** Sélecteur de modèle — placé là où l'on écrit, pas dans l'en-tête. */
 function ModelChip({ conv }: { conv: Conversation }) {
+  const switchModel = useChat((s) => s.switchModel)
   const models = useModels((s) => s.models)
   const running = useModels((s) => s.running)
   const loaded = (name: string) => running.some((r) => r.name === name)
@@ -40,16 +42,7 @@ function ModelChip({ conv }: { conv: Conversation }) {
           key={m.name}
           active={m.name === conv.model}
           icon={m.name === conv.model ? <Check className="size-4 text-fg" /> : null}
-          onClick={() => {
-            /* Un contexte hérité d'un autre modèle peut dépasser le maximum
-               du nouveau : on le ramène dans ses bornes. */
-            const max = m.details?.context_length ?? 8192
-            const current = conv.params.num_ctx ?? suggestedContext(m)
-            void updateConversation(conv.id, {
-              model: m.name,
-              params: { ...conv.params, num_ctx: Math.min(current, max) },
-            })
-          }}
+          onClick={() => void switchModel(conv.id, m.name, m.details?.context_length ?? 8192)}
         >
           <span className="flex items-center gap-2">
             <span className="truncate">{prettyModel(m.name)}</span>
@@ -116,13 +109,13 @@ function PresetChip({ conv }: { conv: Conversation }) {
 }
 
 export function Composer({
-  conversation, settings, streaming, ratio, hasMemory, onSend, onStop,
+  conversation, settings, streaming, usedTokens, hasMemory, onSend, onStop,
 }: {
   conversation: Conversation
   settings: Settings
   streaming: boolean
-  /** Part du contexte occupée, calculée par la vue (mémoire comprise). */
-  ratio: number
+  /** Jetons effectivement occupés, mémoire et flux en cours compris. */
+  usedTokens: number
   hasMemory: boolean
   onSend: (text: string) => void
   onStop: () => void
@@ -157,7 +150,7 @@ export function Composer({
   }
 
   const ctxMax = conversation.params.num_ctx ?? 4096
-  const used = Math.round(ratio * ctxMax) + estimateTokens(text)
+  const used = usedTokens + estimateTokens(text)
   const filled = Math.min(1, used / ctxMax)
   const tight = filled > 0.8
 
@@ -204,7 +197,10 @@ export function Composer({
                 <Button size="icon-sm" disabled className="hidden sm:inline-flex"><Paperclip className="size-4" /></Button>
               </Tooltip>
 
-              <Tooltip label={`Contexte : ${formatNumber(used)} / ${formatNumber(ctxMax)} jetons`} side="top">
+              <Tooltip
+                label={`${formatNumber(used)} jetons sur ${formatNumber(ctxMax)} — ${Math.round(filled * 100)} % du contexte`}
+                side="top"
+              >
                 <span className="hidden items-center gap-2 pr-1 sm:flex">
                   <span className="h-1 w-10 overflow-hidden rounded-full bg-fg/[0.08]">
                     <span
@@ -212,8 +208,8 @@ export function Composer({
                       style={{ width: `${Math.max(3, filled * 100)}%` }}
                     />
                   </span>
-                  <span className={cn('w-7 font-mono text-[11px] tabular-nums', tight ? 'text-caution' : 'text-fg-subtle')}>
-                    {Math.round(filled * 100)}%
+                  <span className={cn('font-mono text-[11px] tabular-nums whitespace-nowrap', tight ? 'text-caution' : 'text-fg-subtle')}>
+                    {formatCompact(used)} / {formatCompact(ctxMax)}
                   </span>
                 </span>
               </Tooltip>

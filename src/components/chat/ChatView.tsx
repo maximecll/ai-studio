@@ -5,13 +5,17 @@ import { useMessages, useSettings } from '../../lib/hooks'
 import type { Conversation } from '../../lib/types'
 import { cn } from '../../lib/utils'
 import { contextUsage } from '../../lib/memory'
+import { estimateTokens } from '../../lib/utils'
 import { useChat } from '../../store/chat'
 import { Button, Chip, SpinButton, useStickToBottom } from '../ui/primitives'
 import { AssistantMessage, StreamingMessage, UserMessage } from './Message'
 import { Composer } from './Composer'
 import { TopBar } from '../layout/TopBar'
+import { LockedView } from './LockedView'
+import { useVault } from '../../store/vault'
 
 export function ChatView({ conv }: { conv: Conversation }) {
+  const vaultUnlocked = useVault((s) => s.unlocked)
   const messages = useMessages(conv.id)
   const settings = useSettings()
   const stream = useChat((s) => s.streams[conv.id])
@@ -23,7 +27,11 @@ export function ChatView({ conv }: { conv: Conversation }) {
 
   const folded = useMemo(() => messages.filter((m) => m.folded), [messages])
   const live = useMemo(() => messages.filter((m) => !m.folded), [messages])
-  const ratio = contextUsage(conv, messages)
+  /* Le flux en cours n'est pas encore en base : sans lui, la jauge resterait
+     figée pendant toute la génération. */
+  const streamed = stream ? estimateTokens(stream.content) + estimateTokens(stream.thinking) : 0
+  const ctxMax = conv.params.num_ctx ?? 4096
+  const usedTokens = Math.round(contextUsage(conv, messages) * ctxMax) + streamed
   const streaming = !!stream
   const lastAssistantId = [...live].reverse().find((m) => m.role === 'assistant')?.id
   /* Flux interrompu (rechargement, coupure) : la question reste sans réponse. */
@@ -31,6 +39,9 @@ export function ChatView({ conv }: { conv: Conversation }) {
   const shown = showFolded ? messages : live
 
   const onSend = useCallback((text: string) => void send(conv.id, text), [conv.id, send])
+
+  // Verrouillée et coffre fermé : on ne montre rien, on explique.
+  if (conv.locked === 1 && !vaultUnlocked) return <LockedView conv={conv} />
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-bg">
@@ -95,6 +106,8 @@ export function ChatView({ conv }: { conv: Conversation }) {
               model={stream.model}
               startedAt={stream.at}
               transcript={conv.transcript}
+              tokens={stream.tokens}
+              thinkingTokens={stream.thinkingTokens}
             />
           )}
         </div>
@@ -115,7 +128,7 @@ export function ChatView({ conv }: { conv: Conversation }) {
           conversation={conv}
           settings={settings}
           streaming={streaming}
-          ratio={ratio}
+          usedTokens={usedTokens}
           hasMemory={!!conv.memory.trim()}
           onSend={onSend}
           onStop={() => stop(conv.id)}

@@ -149,3 +149,10 @@ export function formatRate(bytesPerSecond: number): string {
   if (!bytesPerSecond || !Number.isFinite(bytesPerSecond)) return '—'
   return `${formatBytes(bytesPerSecond)}/s`
 }
+
+/** « 12,4 k » — nombre compact, lisible à toute échelle. */
+export function formatCompact(n: number): string {
+  if (n < 1000) return String(Math.round(n))
+  if (n < 1_000_000) return `${(n / 1000).toFixed(n < 10_000 ? 1 : 0).replace('.', ',')} k`
+  return `${(n / 1_000_000).toFixed(1).replace('.', ',')} M`
+}

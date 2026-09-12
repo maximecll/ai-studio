@@ -78,6 +78,8 @@ export interface Conversation {
   autoTitled: 0 | 1
   /** Vue de transcription — normale, réflexion, détaillée. */
   transcript: Transcript
+  /** Contenus chiffrés au repos, illisibles coffre fermé. */
+  locked: 0 | 1
   /** Mémo Markdown alimenté au fil de la conversation. */
   memory: string
   memoryUpdatedAt: number | null

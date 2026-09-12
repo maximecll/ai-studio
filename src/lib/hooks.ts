@@ -1,6 +1,8 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useState } from 'react'
+import { useVault } from '../store/vault'
 import { DEFAULT_SETTINGS, db, messagesOf } from './db'
+import { openConversation } from './sealed'
 import type { Conversation, Message, Preset, Settings } from './types'
 
 export function useSettings(): Settings {
@@ -9,18 +11,29 @@ export function useSettings(): Settings {
 
 /** `undefined` tant que la base n'a pas répondu — à distinguer d'une base vide. */
 export function useConversations(): Conversation[] | undefined {
+  const unlocked = useVault((s) => s.unlocked)
   return useLiveQuery(
-    async () => (await db.conversations.toArray()).sort((a, b) => b.updatedAt - a.updatedAt),
-    [],
+    async () => {
+      const raw = await db.conversations.toArray()
+      const open = await Promise.all(raw.map(openConversation))
+      return open.sort((a, b) => b.updatedAt - a.updatedAt)
+    },
+    [unlocked],
   )
 }
 
 export function useConversation(id: string | null): Conversation | undefined {
-  return useLiveQuery(async () => (id ? db.conversations.get(id) : undefined), [id])
+  const unlocked = useVault((s) => s.unlocked)
+  return useLiveQuery(async () => {
+    if (!id) return undefined
+    const conv = await db.conversations.get(id)
+    return conv ? openConversation(conv) : undefined
+  }, [id, unlocked])
 }
 
 export function useMessages(id: string | null): Message[] {
-  return useLiveQuery(async () => (id ? messagesOf(id) : []), [id], [])
+  const unlocked = useVault((s) => s.unlocked)
+  return useLiveQuery(async () => (id ? messagesOf(id) : []), [id, unlocked], [])
 }
 
 export function usePresets(): Preset[] {
@@ -65,4 +78,39 @@ export function useMediaQuery(query: string): boolean {
     return () => mq.removeEventListener('change', on)
   }, [query])
   return match
+}
+
+export interface SystemMemory {
+  total: number
+  available: number
+  compressed: number
+  swap: { total: number; used: number }
+  swapping: boolean
+}
+
+/**
+ * Mémoire de la machine, relevée par le serveur.
+ * Le navigateur n'y a pas accès : sans cela, impossible de dire à
+ * l'utilisateur qu'un contexte ne tiendra pas.
+ */
+export function useSystemMemory(intervalMs = 20_000): SystemMemory | null {
+  const [memory, setMemory] = useState<SystemMemory | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    const read = async () => {
+      try {
+        const res = await fetch('/maintenance/memory')
+        const body = await res.json()
+        if (alive && !body.error) setMemory(body)
+      } catch {
+        /* Serveur de production absent : on se passe de l'information. */
+      }
+    }
+    void read()
+    const id = setInterval(read, intervalMs)
+    return () => { alive = false; clearInterval(id) }
+  }, [intervalMs])
+
+  return memory
 }

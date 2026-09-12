@@ -26,6 +26,7 @@ interface UIState {
   presetsOpen: boolean
   shortcutsOpen: boolean
   memoryOpen: boolean
+  vaultOpen: boolean
   toasts: Toast[]
 
   toggleSidebar: () => void
@@ -35,6 +36,7 @@ interface UIState {
   setPresetsOpen: (b: boolean) => void
   setShortcutsOpen: (b: boolean) => void
   setMemoryOpen: (b: boolean) => void
+  setVaultOpen: (b: boolean) => void
   toast: (t: Omit<Toast, 'id'>) => void
   dismiss: (id: string) => void
 }
@@ -47,6 +49,7 @@ export const useUI = create<UIState>((set, get) => ({
   presetsOpen: false,
   shortcutsOpen: false,
   memoryOpen: false,
+  vaultOpen: false,
   toasts: [],
 
   toggleSidebar: () => {
@@ -64,6 +67,7 @@ export const useUI = create<UIState>((set, get) => ({
   setPresetsOpen: (presetsOpen) => set({ presetsOpen }),
   setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
   setMemoryOpen: (memoryOpen) => set({ memoryOpen }),
+  setVaultOpen: (vaultOpen) => set({ vaultOpen }),
 
   toast: (t) => {
     const id = uid()

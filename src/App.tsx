@@ -3,16 +3,21 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { bootstrap } from './lib/db'
 import { useConversations, useHotkey, useMediaQuery, useSettings } from './lib/hooks'
 import { href, navigate, useRoute } from './lib/router'
+import { modKey } from './lib/utils'
 import { useUI } from './store/ui'
 import { useModels } from './store/models'
 import { useChat } from './store/chat'
+import { useVault } from './store/vault'
+import { PanelLeft } from 'lucide-react'
 import { Sidebar } from './components/layout/Sidebar'
+import { Button, Tooltip } from './components/ui/primitives'
 import { ChatView } from './components/chat/ChatView'
 import { HomeView } from './components/home/HomeView'
 import { ModelsView } from './components/models/ModelsView'
 import { NotFound } from './components/NotFound'
-import { Inspector } from './components/settings/Inspector'
+import { ConversationInspector, DefaultsInspector } from './components/settings/Inspector'
 import { MemoryModal } from './components/chat/MemoryModal'
+import { VaultModal } from './components/settings/VaultModal'
 import { SettingsModal } from './components/settings/SettingsModal'
 import { PresetsModal } from './components/settings/PresetsModal'
 import { CommandPalette } from './components/ui/CommandPalette'
@@ -75,6 +80,10 @@ export function App() {
   const activeId = route.name === 'conversation' ? route.id : null
   const streaming = useChat((s) => (activeId ? !!s.streams[activeId] : false))
 
+  const loadVault = useVault((s) => s.load)
+  const vaultUnlocked = useVault((s) => s.unlocked)
+  useEffect(() => { void loadVault() }, [loadVault])
+
   useEffect(() => {
     void refresh()
     const id = setInterval(() => void refresh(true), 15_000)
@@ -103,6 +112,7 @@ export function App() {
   useHotkey('mod+i', (e) => { e.preventDefault(); ui.toggleInspector() })
   useHotkey('mod+,', (e) => { e.preventDefault(); ui.setSettingsOpen(true) })
   useHotkey('mod+/', (e) => { e.preventDefault(); ui.setShortcutsOpen(true) })
+  useHotkey('mod+shift+l', (e) => { e.preventDefault(); useVault.getState().lock() })
   useHotkey('escape', () => {
     if (streaming && activeId && !ui.paletteOpen && !ui.settingsOpen && !ui.presetsOpen) stop(activeId)
   })
@@ -113,6 +123,24 @@ export function App() {
   return (
     <div className="flex h-full overflow-hidden">
       <Sidebar />
+
+      {/* Bascule flottante : l'en-tête n'existe que dans une conversation,
+          sans elle on reste enfermé hors de la barre latérale. */}
+      {!ui.sidebarOpen && (
+        <div className="fixed top-3 left-3 z-30">
+          <Tooltip label="Afficher la barre latérale" kbd={`${modKey}B`} side="right">
+            <Button
+              size="icon"
+              variant="soft"
+              className="bg-surface shadow-card"
+              onClick={ui.toggleSidebar}
+              aria-label="Afficher la barre latérale"
+            >
+              <PanelLeft className="size-4" />
+            </Button>
+          </Tooltip>
+        </div>
+      )}
 
       {route.name === 'home' && <View k="home"><HomeView /></View>}
       {route.name === 'models' && <View k="models"><ModelsView /></View>}
@@ -128,8 +156,12 @@ export function App() {
         )
       )}
 
-      {route.name === 'conversation' && active && ui.inspectorOpen && <Inspector conv={active} />}
+      {/* Rien à régler sur une conversation qu'on ne peut pas lire. */}
+      {route.name === 'conversation' && active && ui.inspectorOpen
+        && !(active.locked === 1 && !vaultUnlocked) && <ConversationInspector conv={active} />}
+      {route.name === 'home' && ui.inspectorOpen && <DefaultsInspector />}
       {active && <MemoryModal conv={active} />}
+      <VaultModal />
 
       <CommandPalette />
       <SettingsModal />

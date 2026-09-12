@@ -52,14 +52,59 @@ Relevés sur MacBook Pro M3 / 16 Go (plafond GPU ≈ 12 Go) :
 | Qwen2.5-Coder 7B Q4 | 4,74 Go | 5,46 Go | 6,41 Go | — (max du modèle) |
 | Qwen3.8 9B NVFP4 | 5,74 Go | 6,17 Go | 6,79 Go · 8,2 jet./s | bascule CPU · 2,2 jet./s |
 
+## Chiffrement au repos — fait
+
+- [x] Clé maîtresse aléatoire, scellée par une clé dérivée de la phrase de
+      passe. PBKDF2-SHA256 à **4 000 000 d'itérations**, calibré sur la machine
+      (le M3 accélère SHA-256 : les 600 000 recommandés ne prenaient que 51 ms,
+      soit une protection illusoire). Compte mémorisé dans le coffre pour
+      pouvoir être relevé plus tard.
+- [x] Verrouillage par conversation : titre, instructions, mémoire, messages et
+      raisonnements chiffrés en AES-GCM. Le reste demeure en clair et cherchable.
+- [x] Coffre fermé : le titre devient « Conversation verrouillée », les contenus
+      restent opaques, la recherche ne les traverse plus.
+- [x] Clé en mémoire seulement — perdue au rechargement, et fermeture
+      automatique après quinze minutes sans activité (⌘⇧L pour fermer aussitôt).
+- [x] Changement de phrase sans rechiffrer les conversations : seule l'enveloppe
+      de la clé maîtresse est refaite.
+
+## Génération et mémoire — ce tour
+
+- [x] **Chien de garde sur le flux.** Un flux peut cesser d'émettre sans fermer
+      la connexion : l'application attendait indéfiniment. Abandon automatique
+      après 90 s de silence (180 s avant le premier fragment, le chargement d'un
+      gros modèle étant long), avec conservation de ce qui a été produit.
+- [x] **Compteur de jetons en direct** pendant la génération, réflexion comptée
+      à part — Ollama émet un fragment par jeton.
+- [x] **Jauge de contexte lisible et vivante.** Elle affichait 0 % : un échange
+      sur 262 144 jetons s'arrondit à zéro. Elle montre désormais des jetons
+      (« 12,4 k / 262 k »), flux en cours compris.
+- [x] **Avertissement mémoire.** Le serveur relève `vm_stat` et `sysctl` — le
+      navigateur n'y a pas accès. Le panneau compare l'empreinte estimée à la
+      mémoire réellement disponible et alerte avant que la machine ne bascule
+      sur le disque.
+- [x] **Conversation verrouillée, coffre fermé** : plus de bloc chiffré affiché
+      à l'écran. Un panneau explique, ouvre la modale du coffre de lui-même,
+      retire le composeur et le panneau de paramètres.
+
 ## En cours
 
-- [ ] **Chiffrement au repos + verrouillage** — clé maîtresse descellée par
-      Touch ID (passkey WebAuthn, extension PRF), passe-phrase de secours en
-      PBKDF2-SHA256 (600 000 itérations), clé par conversation. Contenu des
-      messages et mémo chiffrés en AES-GCM.
-      *En attente d'un arbitrage : titres en clair et cherchables, ou chiffrés
-      et opaques pour les conversations verrouillées ?*
+- [ ] **Déverrouillage par Touch ID** — l'authentificateur de plateforme est
+      disponible sur cette machine ; reste à vérifier la prise en charge de
+      l'extension PRF de WebAuthn, qui permet de sceller la clé maîtresse
+      derrière l'Enclave sécurisée. La phrase de passe resterait le recours.
+
+## À faire — demandé au dernier échange
+
+- [x] **Paramètres accessibles dès l'accueil.** Le panneau y agit sur les
+      valeurs par défaut, qui deviennent celles de la conversation créée.
+      L'Inspecteur est devenu pilotable par une cible générique, avec deux
+      enveloppes : conversation ou valeurs par défaut. Le modèle choisi sur
+      l'accueil est désormais celui des nouvelles conversations — une seule
+      source, partagée avec le panneau.
+- [x] Bascule de la barre latérale accessible partout. Elle n'existait que dans
+      l'en-tête d'une conversation : repliée depuis l'accueil, l'écran Modèles
+      ou une 404, on restait enfermé.
 
 ## À faire
 

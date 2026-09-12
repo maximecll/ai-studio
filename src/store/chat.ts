@@ -19,12 +19,20 @@ export interface Stream {
   /** Horodatage mural, figé au démarrage — pour l'affichage de l'heure. */
   at: number
   ttft?: number
+  /** Jetons produits jusqu'ici — Ollama en émet un par fragment. */
+  tokens: number
+  /** Jetons consommés par le raisonnement, comptés à part. */
+  thinkingTokens: number
+  /** Rang de la reprise automatique, 0 pour la première passe. */
+  continuation: number
 }
 
 interface ChatState {
   streams: Record<string, Stream>
   /** Reprend une réponse interrompue par la limite de longueur. */
   continueLast: (conversationId: string) => Promise<void>
+  /** Change de modèle sans rompre le fil de la conversation. */
+  switchModel: (conversationId: string, model: string, maxContext: number) => Promise<void>
   /** Conversations en cours de compactage. */
   compacting: Record<string, boolean>
   compact: (conversationId: string) => Promise<void>
@@ -36,12 +44,24 @@ interface ChatState {
 
 const controllers = new Map<string, AbortController>()
 
+/**
+ * Surveillance du silence.
+ *
+ * Un flux peut cesser d'émettre sans que la connexion se ferme : le serveur
+ * se tait — mémoire saturée, runner bloqué — et l'application attendrait
+ * indéfiniment. On abandonne alors nous-mêmes, en conservant ce qui a déjà
+ * été produit plutôt que de laisser une génération qui ne reviendra pas.
+ */
+const FIRST_CHUNK_MS = 180_000 // le chargement d'un gros modèle peut être long
+const BETWEEN_CHUNKS_MS = 90_000
+
 /** Rang de la distribution observée pour l'entropie — le « 8 » de H₈. */
 export const TOP_LOGPROBS = 8
 
 export const useChat = create<ChatState>((set, get) => {
   /* Les jetons arrivent vite : on regroupe les mises à jour sur une frame. */
-  const pending = new Map<string, { content: string; thinking: string; ttft?: number }>()
+  type Fragment = { content: string; thinking: string; ttft?: number; tokens: number; thinkingTokens: number }
+  const pending = new Map<string, Fragment>()
   let frame = 0
   const flush = () => {
     frame = 0
@@ -56,7 +76,7 @@ export const useChat = create<ChatState>((set, get) => {
     pending.clear()
     if (changed) set({ streams })
   }
-  const schedule = (id: string, p: { content: string; thinking: string; ttft?: number }) => {
+  const schedule = (id: string, p: Fragment) => {
     pending.set(id, p)
     if (!frame) frame = requestAnimationFrame(flush)
   }
@@ -182,7 +202,10 @@ export const useChat = create<ChatState>((set, get) => {
     set({
       streams: {
         ...get().streams,
-        [conversationId]: { conversationId, messageId, model: conv.model, content: '', thinking: '', startedAt, at: Date.now() },
+        [conversationId]: {
+          conversationId, messageId, model: conv.model, content: '', thinking: '',
+          startedAt, at: Date.now(), tokens: 0, thinkingTokens: 0, continuation: 0,
+        },
       },
     })
 
@@ -192,6 +215,19 @@ export const useChat = create<ChatState>((set, get) => {
     let stats: GenStats | undefined
     let failure: string | undefined
     const tokens: TokenLogprob[] = []
+    let emitted = 0
+    let emittedThinking = 0
+    let silent = false
+
+    let lastChunkAt = Date.now()
+    let seenChunk = false
+    const watchdog = setInterval(() => {
+      const limit = seenChunk ? BETWEEN_CHUNKS_MS : FIRST_CHUNK_MS
+      if (Date.now() - lastChunkAt > limit) {
+        silent = true
+        controller.abort()
+      }
+    }, 5_000)
 
     try {
       for await (const chunk of ollama.chat({
@@ -206,12 +242,21 @@ export const useChat = create<ChatState>((set, get) => {
         for (const lp of chunk.logprobs ?? []) {
           tokens.push({ token: lp.token, logprob: lp.logprob, top: lp.top_logprobs })
         }
-        if (chunk.message?.thinking) thinking += chunk.message.thinking
+        lastChunkAt = Date.now()
+        seenChunk = true
+
+        if (chunk.message?.thinking) {
+          thinking += chunk.message.thinking
+          emittedThinking++
+        }
         if (chunk.message?.content) {
           if (ttft === undefined) ttft = performance.now() - startedAt
           content += chunk.message.content
+          emitted++
         }
-        if (chunk.message) schedule(conversationId, { content, thinking, ttft })
+        if (chunk.message) {
+          schedule(conversationId, { content, thinking, ttft, tokens: emitted, thinkingTokens: emittedThinking })
+        }
         if (chunk.done) {
           stats = {
             totalDuration: chunk.total_duration,
@@ -229,12 +274,28 @@ export const useChat = create<ChatState>((set, get) => {
     } catch (e) {
       const err = e as Error
       if (err.name === 'AbortError') {
-        stats = { ...stats, ttft, doneReason: 'arrêté', uncertainty: summarize(tokens, TOP_LOGPROBS) }
+        stats = {
+          ...stats,
+          ttft,
+          doneReason: silent ? 'silence' : 'arrêté',
+          evalCount: stats?.evalCount ?? emitted,
+          uncertainty: summarize(tokens, TOP_LOGPROBS),
+        }
+        if (silent) {
+          toast({
+            title: 'Le modèle a cessé de répondre',
+            description:
+              'Plus rien reçu depuis une minute et demie. Souvent le signe que la mémoire est saturée. ' +
+              'Ce qui a déjà été produit est conservé.',
+            tone: 'danger',
+          })
+        }
       } else {
         failure = err instanceof OllamaError ? err.message : (err.message || 'Erreur inconnue')
         toast({ title: 'La génération a échoué', description: failure, tone: 'danger' })
       }
     } finally {
+      clearInterval(watchdog)
       controllers.delete(conversationId)
       if (frame) { cancelAnimationFrame(frame); frame = 0 }
       pending.delete(conversationId)
@@ -283,6 +344,34 @@ export const useChat = create<ChatState>((set, get) => {
     streams: {},
     compacting: {},
     compact: (id) => compact(id, true),
+
+    /**
+     * Changer de modèle doit être transparent : le nouveau reçoit toute la
+     * conversation. Deux choses peuvent la rompre, et on les traite ici.
+     *
+     * · Une fenêtre héritée plus grande que celle du nouveau modèle : on la
+     *   ramène dans ses bornes.
+     * · Un historique qui ne tient plus dedans : Ollama le tronquerait en
+     *   silence, en jetant le début. On compacte plutôt, pour que la substance
+     *   passe dans la mémoire au lieu de disparaître.
+     */
+    async switchModel(conversationId, model, maxContext) {
+      const conv = await db.conversations.get(conversationId)
+      if (!conv || conv.model === model) return
+
+      const params = { ...conv.params, num_ctx: Math.min(conv.params.num_ctx ?? maxContext, maxContext) }
+      await updateConversation(conversationId, { model, params })
+
+      const messages = await messagesOf(conversationId)
+      const usage = contextUsage({ ...conv, model, params }, messages)
+      if (usage <= COMPACT_THRESHOLD) return
+
+      toast({
+        title: 'Conversation compactée pour ce modèle',
+        description: "Son contexte est plus étroit : les échanges anciens passent en mémoire plutôt que d'être tronqués.",
+      })
+      await compact(conversationId)
+    },
 
     async continueLast(conversationId) {
       if (get().streams[conversationId]) return

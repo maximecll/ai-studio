@@ -1,12 +1,35 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type PluginOption } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 /** Cible Ollama — surchargeable via OLLAMA_HOST au lancement. */
 const OLLAMA = process.env.OLLAMA_HOST ?? 'http://127.0.0.1:11434'
 
+/**
+ * L'entretien du magasin Ollama touche au système de fichiers : il vit côté
+ * serveur. Ce greffon monte le même gestionnaire qu'en production, pour que
+ * le comportement soit identique en développement.
+ */
+function maintenance(): PluginOption {
+  return {
+    name: 'studio-maintenance',
+    configureServer(server) {
+      server.middlewares.use('/maintenance/blobs', async (req, res) => {
+        // @ts-expect-error — module serveur en JavaScript, sans types
+        const { handle } = await import('./server/blobs.mjs')
+        await handle(req, res)
+      })
+      server.middlewares.use('/maintenance/memory', async (req, res) => {
+        // @ts-expect-error — module serveur en JavaScript, sans types
+        const { handle } = await import('./server/system.mjs')
+        await handle(req, res)
+      })
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), maintenance()],
   server: {
     port: 5273,
     host: true,

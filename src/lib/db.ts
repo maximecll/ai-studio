@@ -1,6 +1,9 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { Conversation, Folder, Message, Params, Preset, Settings } from './types'
+import type { Vault } from './crypto'
 import { fullDate, uid } from './utils'
+import { hasMaster, openConversation, openMessage, sealConversation, sealMessage } from './sealed'
+import { isSealed } from './crypto'
 
 class StudioDB extends Dexie {
   conversations!: EntityTable<Conversation, 'id'>
@@ -8,6 +11,7 @@ class StudioDB extends Dexie {
   presets!: EntityTable<Preset, 'id'>
   folders!: EntityTable<Folder, 'id'>
   settings!: EntityTable<Settings, 'id'>
+  vault!: EntityTable<Vault, 'id'>
 
   constructor() {
     super('ollama-studio')
@@ -42,6 +46,22 @@ class StudioDB extends Dexie {
         c.memoryUpdatedAt ??= null
       }),
     )
+
+    // v4 : coffre et verrouillage par conversation.
+    this.version(4)
+      .stores({
+        conversations: 'id, updatedAt, createdAt, pinned, folderId, archived, locked, *tags',
+        messages: 'id, conversationId, createdAt, [conversationId+createdAt]',
+        presets: 'id, name, createdAt',
+        folders: 'id, order, name',
+        settings: 'id',
+        vault: 'id',
+      })
+      .upgrade((tx) =>
+        tx.table('conversations').toCollection().modify((c: Record<string, unknown>) => {
+          c.locked ??= 0
+        }),
+      )
   }
 }
 
@@ -175,6 +195,7 @@ export async function createConversation(init: Partial<Conversation> = {}): Prom
     presetId: null,
     autoTitled: 0,
     transcript: s.defaultTranscript,
+    locked: 0,
     memory: '',
     memoryUpdatedAt: null,
     ...init,
@@ -191,7 +212,16 @@ export async function touchConversation(id: string): Promise<void> {
 }
 
 export async function updateConversation(id: string, patch: Partial<Conversation>): Promise<void> {
-  await db.conversations.update(id, { ...patch, updatedAt: Date.now() })
+  const existing = await db.conversations.get(id)
+  if (!existing) return
+  const merged = { ...existing, ...patch, updatedAt: Date.now() } as Conversation
+  await db.conversations.put(await sealConversation(merged))
+}
+
+/** Lecture d'une conversation, déchiffrée si le coffre est ouvert. */
+export async function getConversation(id: string): Promise<Conversation | undefined> {
+  const conv = await db.conversations.get(id)
+  return conv ? openConversation(conv) : undefined
 }
 
 export async function deleteConversation(id: string): Promise<void> {
@@ -221,21 +251,36 @@ export async function duplicateConversation(id: string): Promise<string | null> 
   return newId
 }
 
-export function messagesOf(conversationId: string): Promise<Message[]> {
+/** Lecture des messages, déchiffrés si le coffre est ouvert. */
+export async function messagesOf(conversationId: string): Promise<Message[]> {
+  const raw = await db.messages.where('conversationId').equals(conversationId).sortBy('createdAt')
+  return Promise.all(raw.map(openMessage))
+}
+
+/** Lecture brute, sans déchiffrement — pour les manipulations de structure. */
+export function rawMessagesOf(conversationId: string): Promise<Message[]> {
   return db.messages.where('conversationId').equals(conversationId).sortBy('createdAt')
+}
+
+async function isLocked(conversationId: string): Promise<boolean> {
+  return (await db.conversations.get(conversationId))?.locked === 1
 }
 
 /* ── Messages ─────────────────────────────────────────────────────── */
 
 export async function addMessage(m: Omit<Message, 'id' | 'createdAt'> & Partial<Pick<Message, 'id' | 'createdAt'>>): Promise<string> {
   const msg: Message = { id: m.id ?? uid(), createdAt: m.createdAt ?? Date.now(), ...m } as Message
-  await db.messages.add(msg)
+  await db.messages.add(await sealMessage(msg, await isLocked(msg.conversationId)))
   await touchConversation(msg.conversationId)
   return msg.id
 }
 
 export async function updateMessage(id: string, patch: Partial<Message>): Promise<void> {
-  await db.messages.update(id, patch)
+  const existing = await db.messages.get(id)
+  if (!existing) return
+  const locked = await isLocked(existing.conversationId)
+  const sealed = await sealMessage({ ...existing, ...patch } as Message, locked)
+  await db.messages.update(id, sealed)
 }
 
 export async function deleteMessage(id: string): Promise<void> {
@@ -247,6 +292,29 @@ export async function deleteMessagesFrom(conversationId: string, createdAt: numb
   const all = await messagesOf(conversationId)
   const doomed = all.filter((m) => (inclusive ? m.createdAt >= createdAt : m.createdAt > createdAt))
   await db.messages.bulkDelete(doomed.map((m) => m.id))
+}
+
+/**
+ * Verrouille ou déverrouille une conversation, en rechiffrant tout l'existant.
+ * Exige un coffre ouvert : sans clé maîtresse, l'opération n'a aucun sens.
+ */
+export async function setConversationLocked(id: string, locked: boolean): Promise<void> {
+  if (!hasMaster()) throw new Error('Le coffre doit être ouvert.')
+  const conv = await db.conversations.get(id)
+  if (!conv || (conv.locked === 1) === locked) return
+
+  const stored = await rawMessagesOf(id)
+  // À l'état actuel : en clair si la conversation était ouverte, scellé sinon.
+  const plain = await Promise.all(stored.map(openMessage))
+  const openConv = await openConversation(conv)
+
+  const nextConv: Conversation = { ...openConv, locked: locked ? 1 : 0, updatedAt: Date.now() }
+  const nextMsgs = await Promise.all(plain.map((m) => sealMessage(m, locked)))
+
+  await db.transaction('rw', db.conversations, db.messages, async () => {
+    await db.conversations.put(await sealConversation(nextConv))
+    await db.messages.bulkPut(nextMsgs)
+  })
 }
 
 /* ── Recherche ────────────────────────────────────────────────────── */
@@ -261,17 +329,23 @@ export async function search(query: string, limit = 40): Promise<SearchHit[]> {
   const q = query.trim().toLowerCase()
   if (!q) return []
   const convs = await db.conversations.toArray()
-  const byId = new Map(convs.map((c) => [c.id, c]))
   const hits = new Map<string, SearchHit>()
 
-  for (const c of convs) {
+  const open = await Promise.all(convs.map(openConversation))
+  const readable = new Map(open.map((c) => [c.id, c]))
+  const locked = new Set(convs.filter((c) => c.locked === 1).map((c) => c.id))
+
+  for (const c of open) {
+    if (locked.has(c.id) && !hasMaster()) continue
     if (c.title.toLowerCase().includes(q)) hits.set(c.id, { conversation: c, matchedIn: 'title' })
   }
   await db.messages.each((m) => {
     if (hits.has(m.conversationId)) return
+    if (locked.has(m.conversationId) && !hasMaster()) return
+    if (isSealed(m.content)) return // chiffré : non indexable en l'état
     const idx = m.content.toLowerCase().indexOf(q)
     if (idx === -1) return
-    const conv = byId.get(m.conversationId)
+    const conv = readable.get(m.conversationId)
     if (!conv) return
     const start = Math.max(0, idx - 45)
     hits.set(m.conversationId, {

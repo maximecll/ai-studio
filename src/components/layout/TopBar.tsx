@@ -1,15 +1,16 @@
 import {
-  AlignLeft, Brain, Check, Download, FileJson, LayoutList, Lightbulb, MoreHorizontal,
-  PanelLeft, RefreshCw, SlidersHorizontal, Trash2,
+  AlignLeft, Brain, Check, Download, FileJson, LayoutList, Lightbulb, Lock, LockOpen,
+  MoreHorizontal, RefreshCw, SlidersHorizontal, Trash2,
 } from 'lucide-react'
-import { deleteConversation, exportJSON, exportMarkdown, updateConversation } from '../../lib/db'
+import { deleteConversation, exportJSON, exportMarkdown, setConversationLocked, updateConversation } from '../../lib/db'
 import type { Conversation, Transcript } from '../../lib/types'
-import { download, modKey, slugify } from '../../lib/utils'
+import { cn, download, modKey, slugify } from '../../lib/utils'
 import { useModels } from '../../store/models'
 import { useUI } from '../../store/ui'
-import { useMediaQuery } from '../../lib/hooks'
 import { Button, Menu, MenuItem, MenuLabel, MenuSeparator, SpinButton, Tooltip } from '../ui/primitives'
 import { useChat } from '../../store/chat'
+import { useVault } from '../../store/vault'
+import { toast } from '../../store/ui'
 import { href, navigate } from '../../lib/router'
 
 const VIEWS: Array<{ value: Transcript; label: string; icon: React.ReactNode; hint: string }> = [
@@ -23,22 +24,33 @@ const VIEWS: Array<{ value: Transcript; label: string; icon: React.ReactNode; hi
  * mathématiquement, quel que soit le nombre d'actions de part et d'autre.
  */
 export function TopBar({ conv }: { conv: Conversation }) {
-  const { sidebarOpen, toggleSidebar, inspectorOpen, toggleInspector, setMemoryOpen } = useUI()
+  const { sidebarOpen, inspectorOpen, toggleInspector, setMemoryOpen } = useUI()
   const refresh = useModels((s) => s.refresh)
   const compact = useChat((s) => s.compact)
-  const wide = useMediaQuery('(min-width: 901px)')
+  const { unlocked, exists } = useVault()
+  const setVaultOpen = useUI((s) => s.setVaultOpen)
+
+  /* Verrouiller suppose un coffre ouvert : sinon on y mène d'abord. */
+  const toggleLock = async () => {
+    if (!unlocked || exists === false) { setVaultOpen(true); return }
+    try {
+      await setConversationLocked(conv.id, conv.locked !== 1)
+      toast({
+        title: conv.locked ? 'Conversation déverrouillée' : 'Conversation verrouillée',
+        description: conv.locked
+          ? 'Son contenu est de nouveau stocké en clair.'
+          : 'Titre, instructions et messages sont désormais chiffrés au repos.',
+        tone: 'success',
+      })
+    } catch (e) {
+      toast({ title: 'Opération impossible', description: (e as Error).message, tone: 'danger' })
+    }
+  }
 
   return (
     <header className="grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-line px-3">
-      <div className="flex items-center gap-1">
-        {(!sidebarOpen || !wide) && (
-          <Tooltip label="Afficher la barre latérale" kbd={`${modKey}B`}>
-            <Button size="icon" onClick={toggleSidebar} aria-label="Afficher la barre latérale">
-              <PanelLeft className="size-4" />
-            </Button>
-          </Tooltip>
-        )}
-      </div>
+      {/* Décalage quand la bascule flottante occupe le coin. */}
+      <div className={cn('flex items-center gap-1', !sidebarOpen && 'pl-12')} />
 
       <h1 className="t-ui min-w-0 truncate text-center text-fg">{conv.title}</h1>
 
@@ -72,6 +84,12 @@ export function TopBar({ conv }: { conv: Conversation }) {
           ))}
 
           <MenuSeparator />
+          <MenuItem
+            icon={conv.locked ? <LockOpen className="size-4" /> : <Lock className="size-4" />}
+            onClick={() => void toggleLock()}
+          >
+            {conv.locked ? 'Déverrouiller' : 'Verrouiller cette conversation'}
+          </MenuItem>
           <MenuItem icon={<Brain className="size-4" />} onClick={() => setMemoryOpen(true)}>
             Mémoire de la conversation
           </MenuItem>

@@ -16,7 +16,9 @@ const ENTER = {
 
 /* ── Raisonnement — panneau inséré, sans barre de citation ────────── */
 
-function Thinking({ text, live, defaultOpen }: { text: string; live?: boolean; defaultOpen?: boolean }) {
+function Thinking({
+  text, live, defaultOpen, count = 0,
+}: { text: string; live?: boolean; defaultOpen?: boolean; count?: number }) {
   const [open, setOpen] = useState(!!defaultOpen)
   /* Changer de vue réapplique l'état par défaut aux messages déjà affichés :
      sans cela, un message déplié en « détaillée » le restait en « normale ». */
@@ -34,6 +36,9 @@ function Thinking({ text, live, defaultOpen }: { text: string; live?: boolean; d
       >
         {live && <span className="size-1.5 animate-pulse rounded-full bg-accent" />}
         {live ? 'Réflexion en cours' : 'Raisonnement'}
+        {live && count > 0 && (
+          <span className="font-mono tabular-nums opacity-70">{formatNumber(count)}</span>
+        )}
         <ChevronRight className={cn('size-3.5 transition-transform duration-200', open && 'rotate-90')} />
       </motion.button>
 
@@ -314,13 +319,23 @@ export const AssistantMessage = memo(function AssistantMessage({
 /* ── Génération en cours ──────────────────────────────────────────── */
 
 export function StreamingMessage({
-  content, thinking, model, startedAt, transcript = 'normal',
-}: { content: string; thinking: string; model: string; startedAt: number; transcript?: Transcript }) {
+  content, thinking, model, startedAt, transcript = 'normal', tokens = 0, thinkingTokens = 0,
+}: {
+  content: string
+  thinking: string
+  model: string
+  startedAt: number
+  transcript?: Transcript
+  tokens?: number
+  thinkingTokens?: number
+}) {
   const waiting = !content && !thinking
   return (
     <motion.div {...ENTER} className="max-w-[94%]">
       <ModelLabel model={model} at={startedAt} />
-      {thinking && <Thinking text={thinking} live={!content} defaultOpen={transcript !== 'normal'} />}
+      {thinking && (
+        <Thinking text={thinking} live={!content} defaultOpen={transcript !== 'normal'} count={thinkingTokens} />
+      )}
       {waiting ? (
         <p className="t-meta flex h-6 items-center gap-2 text-fg-subtle">
           <span className="flex gap-1">
@@ -339,6 +354,12 @@ export function StreamingMessage({
         <>
           <Markdown>{content}</Markdown>
           {content && <span className="ml-0.5 inline-block h-4 w-[2px] translate-y-0.5 animate-caret bg-accent align-middle" />}
+          {tokens > 0 && (
+            <p className="mt-2 font-mono text-[11px] tabular-nums text-fg-subtle">
+              {formatNumber(tokens)} jeton{tokens > 1 ? 's' : ''}
+              {thinkingTokens > 0 && <> · {formatNumber(thinkingTokens)} de réflexion</>}
+            </p>
+          )}
         </>
       )}
     </motion.div>

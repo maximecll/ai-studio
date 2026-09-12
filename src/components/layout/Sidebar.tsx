@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
-  Boxes, Copy, Download, FileJson, MoreHorizontal, PanelLeft, Pencil, Pin, PinOff, Plus,
-  Search, Settings as SettingsIcon, Sparkles, Trash2, X,
+  Boxes, Copy, Download, FileJson, Lock, LockOpen, MoreHorizontal, PanelLeft, Pencil, Pin,
+  PinOff, Plus, Search, Settings as SettingsIcon, Sparkles, Trash2, X,
 } from 'lucide-react'
 import {
   deleteConversation, duplicateConversation, exportJSON, exportMarkdown, updateConversation,
@@ -13,6 +13,7 @@ import { cn, download, modKey, shortTime, slugify, timeBucket } from '../../lib/
 import { href, navigate, useRoute } from '../../lib/router'
 import { useUI } from '../../store/ui'
 import { useModels } from '../../store/models'
+import { useVault } from '../../store/vault'
 import { Button, ConfirmModal, Menu, MenuItem, MenuSeparator, Tooltip } from '../ui/primitives'
 
 function StatusDot() {
@@ -96,6 +97,7 @@ function ConversationRow({
       onClick={onOpen}
       onDoubleClick={() => { setDraft(conv.title); setRenaming(true) }}
     >
+      {conv.locked === 1 && <Lock className="size-3 shrink-0 text-fg-subtle" />}
       {conv.pinned === 1 && <Pin className="size-3 shrink-0 -rotate-45 text-fg-subtle" />}
       <span className="min-w-0 flex-1 truncate">{conv.title}</span>
       <span className="t-caption shrink-0 text-fg-subtle opacity-0 transition-opacity group-hover/row:opacity-0 sm:opacity-100">
@@ -157,7 +159,8 @@ function ConversationRow({
 
 export function Sidebar() {
   const conversations = useConversations() ?? []
-  const { setSettingsOpen, setPresetsOpen, sidebarOpen, toggleSidebar } = useUI()
+  const { setSettingsOpen, setPresetsOpen, setVaultOpen, sidebarOpen, toggleSidebar } = useUI()
+  const vault = useVault()
   const route = useRoute()
   const activeId = route.name === 'conversation' ? route.id : null
   const modelCount = useModels((s) => s.models.length)
@@ -295,6 +298,16 @@ export function Sidebar() {
           trailing={modelCount ? <span className="font-mono text-[11px] text-fg-subtle">{modelCount}</span> : undefined}
         />
         <NavRow icon={<Sparkles className="size-4" />} label="Presets" onClick={() => setPresetsOpen(true)} />
+        <NavRow
+          icon={vault.unlocked ? <LockOpen className="size-4" /> : <Lock className="size-4" />}
+          label="Coffre"
+          onClick={() => (vault.unlocked ? vault.lock() : setVaultOpen(true))}
+          trailing={
+            <span className={cn('t-caption', vault.unlocked ? 'text-positive' : 'text-fg-subtle')}>
+              {vault.exists === false ? 'à créer' : vault.unlocked ? 'ouvert' : 'fermé'}
+            </span>
+          }
+        />
         <NavRow
           icon={<SettingsIcon className="size-4" />} label="Réglages" onClick={() => setSettingsOpen(true)}
           trailing={<span className="font-mono text-[11px] text-fg-subtle">{modKey},</span>}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { db } from '../../lib/db'
-import type { Conversation } from '../../lib/types'
+import type { Params } from '../../lib/types'
 import { cn, uid } from '../../lib/utils'
 import { PRESET_ICON_KEYS, PresetGlyph } from '../../lib/preset-icons'
 import { toast } from '../../store/ui'
@@ -29,7 +29,12 @@ export function IconPicker({ value, onChange }: { value: string; onChange: (v: s
 
 export function SavePresetModal({
   open, onClose, conv,
-}: { open: boolean; onClose: () => void; conv: Conversation }) {
+}: {
+  open: boolean
+  onClose: () => void
+  /** Ce qu'on enregistre : un modèle, des instructions, des paramètres. */
+  conv: { model: string; system: string; params: Params }
+}) {
   const [name, setName] = useState('')
   const [icon, setIcon] = useState('sparkles')
   const [description, setDescription] = useState('')

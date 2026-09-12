@@ -6,6 +6,7 @@ import { cn, formatBytes, formatNumber } from '../../lib/utils'
 import { estimateMemory, hasCapability, prettyModel } from '../../lib/ollama'
 import { findModel, useModels } from '../../store/models'
 import { toast, useUI } from '../../store/ui'
+import { useSettings, useSystemMemory } from '../../lib/hooks'
 import { Badge, Button, Field, Input, Slider, Switch, Textarea, Tooltip } from '../ui/primitives'
 import { SavePresetModal } from './SavePresetModal'
 
@@ -17,17 +18,48 @@ function MemoryHint({
   weights, shape, numCtx,
 }: { weights: number; shape: Parameters<typeof estimateMemory>[1]; numCtx: number }) {
   const est = estimateMemory(weights, shape, numCtx)
+  const system = useSystemMemory()
   if (!est) return null
+
+  // Marge de sécurité : le système a besoin de respirer à côté du modèle.
+  const budget = system ? system.available * 0.9 : null
+  const tight = budget !== null && est.total > budget
+
   return (
-    <div className="rounded-sm bg-surface-2 px-3 py-2.5">
+    <div className={cn('rounded-sm px-3 py-2.5', tight ? 'bg-caution-wash' : 'bg-surface-2')}>
       <div className="flex items-baseline justify-between gap-2">
         <span className="t-caption text-fg-muted">Empreinte estimée</span>
-        <span className="font-mono text-[13px] font-bold tabular-nums text-fg">≈ {formatBytes(est.total)}</span>
+        <span className={cn('font-mono text-[13px] font-bold tabular-nums', tight ? 'text-caution' : 'text-fg')}>
+          ≈ {formatBytes(est.total)}
+        </span>
       </div>
-      <p className="t-caption mt-1 text-fg-subtle">
-        {formatBytes(est.weights)} de poids + {formatBytes(est.cache)} de cache d'attention.
-        Au-delà de la mémoire disponible, une partie bascule sur le processeur et la génération ralentit nettement.
+
+      {system && (
+        <div className="mt-1 flex items-baseline justify-between gap-2">
+          <span className="t-caption text-fg-muted">Mémoire disponible</span>
+          <span className="font-mono text-[13px] tabular-nums text-fg-muted">{formatBytes(system.available)}</span>
+        </div>
+      )}
+
+      <p className="t-caption mt-1.5 text-fg-subtle">
+        {tight ? (
+          <>
+            Ce contexte dépasse ce que la machine peut offrir. Une partie du modèle serait relue
+            depuis le disque à chaque jeton : la génération deviendrait extrêmement lente.
+            Réduisez le contexte, ou fermez des applications.
+          </>
+        ) : (
+          <>
+            {formatBytes(est.weights)} de poids + {formatBytes(est.cache)} de cache d'attention.
+          </>
+        )}
       </p>
+
+      {system?.swapping && !tight && (
+        <p className="t-caption mt-1.5 text-caution">
+          La machine utilise déjà massivement le disque comme mémoire ({formatBytes(system.swap.used)} d'échange).
+        </p>
+      )}
     </div>
   )
 }
@@ -50,19 +82,33 @@ function Section({
   )
 }
 
-export function Inspector({ conv }: { conv: Conversation }) {
+/** Ce sur quoi le panneau agit : une conversation, ou les valeurs par défaut. */
+export interface InspectorTarget {
+  model: string
+  system: string
+  params: Params
+  think?: boolean
+}
+
+function Inspector({
+  target, onPatch, heading, footer,
+}: {
+  target: InspectorTarget
+  onPatch: (patch: Partial<InspectorTarget>) => void
+  heading: string
+  footer?: React.ReactNode
+}) {
   const toggleInspector = useUI((s) => s.toggleInspector)
   const models = useModels((s) => s.models)
-  const model = findModel(models, conv.model)
-  const shape = useModels((s) => s.shapes[conv.model])
+  const model = findModel(models, target.model)
+  const shape = useModels((s) => s.shapes[target.model])
   const loadShape = useModels((s) => s.loadShape)
   const [savePreset, setSavePreset] = useState(false)
 
-  useEffect(() => { if (conv.model) void loadShape(conv.model) }, [conv.model, loadShape])
+  useEffect(() => { if (target.model) void loadShape(target.model) }, [target.model, loadShape])
 
-  const p = conv.params
-  const set = (patch: Partial<Params>) =>
-    void updateConversation(conv.id, { params: { ...p, ...patch }, presetId: null })
+  const p = target.params
+  const set = (patch: Partial<Params>) => onPatch({ params: { ...p, ...patch } })
 
   const maxCtx = model?.details?.context_length ?? 32768
   const ctxStep = maxCtx > 65536 ? 4096 : maxCtx > 16384 ? 1024 : 256
@@ -70,14 +116,14 @@ export function Inspector({ conv }: { conv: Conversation }) {
   return (
     <aside className="flex w-80 shrink-0 flex-col border-l border-line bg-nav">
       <div className="flex h-16 shrink-0 items-center gap-1 border-b border-line px-5">
-        <h2 className="flex-1 text-[15px] font-bold tracking-[-0.02em]">Paramètres</h2>
+        <h2 className="flex-1 text-[15px] font-bold tracking-[-0.02em]">{heading}</h2>
         <Tooltip label="Enregistrer comme preset">
           <Button size="icon-sm" onClick={() => setSavePreset(true)}><Save size={16} /></Button>
         </Tooltip>
         <Tooltip label="Tout réinitialiser">
           <Button
             size="icon-sm"
-            onClick={() => void updateConversation(conv.id, { params: { ...DEFAULT_PARAMS }, presetId: null })}
+            onClick={() => onPatch({ params: { ...DEFAULT_PARAMS } })}
           >
             <RotateCcw size={16} />
           </Button>
@@ -88,8 +134,8 @@ export function Inspector({ conv }: { conv: Conversation }) {
       <div className="min-h-0 flex-1 overflow-y-auto scroll-thin">
         <Section title="Instructions système" hint="Message caché placé en tête de conversation. Définit le rôle et le ton du modèle.">
           <Textarea
-            value={conv.system}
-            onChange={(e) => void updateConversation(conv.id, { system: e.target.value, presetId: null })}
+            value={target.system}
+            onChange={(e) => onPatch({ system: e.target.value })}
             placeholder="Tu es un assistant…"
             rows={5}
             className="min-h-28"
@@ -202,8 +248,8 @@ export function Inspector({ conv }: { conv: Conversation }) {
             <Switch
               label="Mode réflexion"
               hint="Le modèle raisonne avant de répondre. Plus lent, plus fiable."
-              checked={conv.think ?? true}
-              onChange={(v) => void updateConversation(conv.id, { think: v })}
+              checked={target.think ?? true}
+              onChange={(v) => onPatch({ think: v })}
             />
           )}
         </Section>
@@ -237,20 +283,65 @@ export function Inspector({ conv }: { conv: Conversation }) {
           )}
         </Section>
 
+        {footer}
+      </div>
+
+      <SavePresetModal open={savePreset} onClose={() => setSavePreset(false)} conv={target} />
+    </aside>
+  )
+}
+
+
+/** Panneau branché sur une conversation existante. */
+export function ConversationInspector({ conv }: { conv: Conversation }) {
+  return (
+    <Inspector
+      heading="Paramètres"
+      target={conv}
+      onPatch={(patch) => void updateConversation(conv.id, { ...patch, presetId: null })}
+      footer={
         <div className="p-5">
           <Button
             variant="soft" size="sm" className="w-full"
             onClick={async () => {
-              await patchSettings({ defaultParams: { ...p }, defaultSystem: conv.system, defaultModel: conv.model })
+              await patchSettings({
+                defaultParams: { ...conv.params },
+                defaultSystem: conv.system,
+                defaultModel: conv.model,
+              })
               toast({ title: 'Réglages par défaut mis à jour', tone: 'success' })
             }}
           >
             Définir comme valeurs par défaut
           </Button>
         </div>
-      </div>
+      }
+    />
+  )
+}
 
-      <SavePresetModal open={savePreset} onClose={() => setSavePreset(false)} conv={conv} />
-    </aside>
+/**
+ * Panneau de l'accueil : il agit sur les valeurs par défaut, qui deviennent
+ * celles de la conversation créée. Pas de conversation fantôme, et le réglage
+ * sert aussi aux suivantes.
+ */
+export function DefaultsInspector() {
+  const settings = useSettings()
+  return (
+    <Inspector
+      heading="Paramètres par défaut"
+      target={{ model: settings.defaultModel, system: settings.defaultSystem, params: settings.defaultParams }}
+      onPatch={(patch) =>
+        void patchSettings({
+          ...(patch.params ? { defaultParams: patch.params } : {}),
+          ...(patch.system !== undefined ? { defaultSystem: patch.system } : {}),
+        })
+      }
+      footer={
+        <p className="t-caption p-5 text-fg-subtle">
+          Ces réglages s'appliqueront à la conversation que vous allez ouvrir, et aux suivantes.
+        </p>
+      }
+    />
   )
 }

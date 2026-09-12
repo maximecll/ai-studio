@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowUpRight, Check, ChevronDown, Circle, Clock, Send } from 'lucide-react'
-import { createConversation, updateConversation } from '../../lib/db'
+import { ArrowUpRight, Check, ChevronDown, Circle, Clock, Send, SlidersHorizontal } from 'lucide-react'
+import { createConversation, patchSettings, updateConversation } from '../../lib/db'
 import { useConversations, usePresets, useSettings } from '../../lib/hooks'
 import { PresetGlyph } from '../../lib/preset-icons'
 import { href, navigate } from '../../lib/router'
@@ -10,7 +10,8 @@ import { cn, modKey, relativeTime } from '../../lib/utils'
 import { prettyModel, suggestedContext } from '../../lib/ollama'
 import { useModels } from '../../store/models'
 import { useChat } from '../../store/chat'
-import { Chip, Menu, MenuItem, MenuLabel, MorphButton } from '../ui/primitives'
+import { useUI } from '../../store/ui'
+import { Button, Chip, Menu, MenuItem, MenuLabel, MorphButton, Tooltip } from '../ui/primitives'
 
 const SUGGESTIONS = [
   'Explique-moi ce concept simplement',
@@ -33,25 +34,27 @@ export function HomeView() {
 
   const [text, setText] = useState('')
   const [preset, setPreset] = useState<Preset | null>(null)
-  const [model, setModel] = useState('')
   const ref = useRef<HTMLTextAreaElement>(null)
+  const { inspectorOpen, toggleInspector } = useUI()
 
-  /* L'inventaire est rafraîchi toutes les 15 s : sans ce garde, chaque
-     sondage réécrasait le modèle choisi par le défaut. On ne retombe sur le
-     défaut que si la sélection courante a disparu. */
-  useEffect(() => {
-    setModel((cur) => (cur && models.some((m) => m.name === cur) ? cur : settings.defaultModel || models[0]?.name || ''))
-  }, [settings.defaultModel, models])
+  /* Le modèle de l'accueil est celui des nouvelles conversations : une seule
+     source de vérité, partagée avec le panneau de paramètres. Le choix est
+     persisté, donc le sondage de l'inventaire ne peut plus l'écraser. */
+  const model = settings.defaultModel || models[0]?.name || ''
+  const setModel = (name: string) => void patchSettings({ defaultModel: name })
+
   useEffect(() => { requestAnimationFrame(() => ref.current?.focus()) }, [])
 
   const start = async (message: string) => {
     const body = message.trim()
     if (!body || !model) return
     const chosen = models.find((m) => m.name === model)
-    const id = await createConversation({
-      model,
-      params: { ...settings.defaultParams, num_ctx: suggestedContext(chosen) },
-    })
+    /* Un contexte réglé à la main prime ; sinon on l'ajuste au modèle. */
+    const params = {
+      ...settings.defaultParams,
+      num_ctx: settings.defaultParams.num_ctx ?? suggestedContext(chosen),
+    }
+    const id = await createConversation({ model, params, system: settings.defaultSystem })
     if (preset) {
       await updateConversation(id, {
         presetId: preset.id,
@@ -69,8 +72,21 @@ export function HomeView() {
   const recent = conversations.slice(0, 4)
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto scroll-thin">
-      <div className="mx-auto flex w-full max-w-[820px] flex-1 flex-col justify-center px-6 py-12">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <header className="grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-line px-3">
+        <span />
+        <h1 className="t-ui truncate text-center text-fg-muted">Nouvelle conversation</h1>
+        <div className="flex items-center justify-end">
+          <Tooltip label="Paramètres par défaut" kbd={`${modKey}I`}>
+            <Button size="icon" active={inspectorOpen} onClick={toggleInspector} aria-label="Paramètres par défaut">
+              <SlidersHorizontal className="size-4" />
+            </Button>
+          </Tooltip>
+        </div>
+      </header>
+
+      <div className="min-h-0 flex-1 overflow-y-auto scroll-thin">
+      <div className="mx-auto flex w-full max-w-[820px] flex-col justify-center px-6 py-12">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -205,6 +221,7 @@ export function HomeView() {
             </section>
           )}
         </motion.div>
+      </div>
       </div>
     </div>
   )

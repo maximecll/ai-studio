@@ -12,6 +12,7 @@ import { useModels } from '../../store/models'
 import { downloadFor, useDownloads } from '../../store/downloads'
 import { DownloadRow } from './DownloadRow'
 import { ModelBrowser } from './ModelBrowser'
+import { Maintenance } from './Maintenance'
 import { toast } from '../../store/ui'
 import { Badge, Button, ConfirmModal, Tooltip } from '../ui/primitives'
 import { href, navigate } from '../../lib/router'
@@ -225,6 +226,8 @@ export function ModelsView() {
               ))}
             </div>
           )}
+
+          <Maintenance />
 
           {models.length === 0 && status === 'online' && (
             <div className="rounded-lg border border-dashed border-line py-20 text-center">

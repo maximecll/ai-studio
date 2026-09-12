@@ -10,6 +10,8 @@ import { createServer as createSecureServer, request as httpsRequest } from 'nod
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
 import { extname, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { handle as handleBlobs } from './server/blobs.mjs'
+import { handle as handleMemory } from './server/system.mjs'
 
 const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)))
 const DIST = join(ROOT, 'dist')
@@ -104,6 +106,8 @@ function serveFile(res, file, status = 200) {
 function handle(req, res) {
   if (req.url.startsWith('/ollama')) return proxy(req, res)
   if (req.url.startsWith('/hf')) return proxyHuggingFace(req, res)
+  if (req.url.startsWith('/maintenance/blobs')) return void handleBlobs(req, res)
+  if (req.url.startsWith('/maintenance/memory')) return void handleMemory(req, res)
 
   const url = new URL(req.url, `http://${HOST}`)
   const rel = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, '')
