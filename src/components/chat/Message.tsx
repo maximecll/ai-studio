@@ -1,6 +1,9 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Check, ChevronRight, CornerDownRight, Copy, Pencil, RefreshCw, Sparkles, Trash2, TriangleAlert } from 'lucide-react'
+import {
+  Check, ChevronRight, CornerDownRight, Copy, Pencil, RefreshCw, Sparkles,
+  SquareArrowOutUpRight, Trash2, TriangleAlert,
+} from 'lucide-react'
 import type { Message as Msg, Transcript } from '../../lib/types'
 import { cn, formatMs, formatNumber, formatNs, shortTime, tokensPerSecond } from '../../lib/utils'
 import { entropyBand } from '../../lib/entropy'
@@ -166,8 +169,16 @@ function Disclosure({ label, children }: { label: string; children: React.ReactN
 /* ── Message de l'utilisateur — à droite ──────────────────────────── */
 
 export const UserMessage = memo(function UserMessage({
-  message, onEdit, onDelete, disabled, faded,
-}: { message: Msg; onEdit: (text: string) => void; onDelete: () => void; disabled?: boolean; faded?: boolean }) {
+  message, onEdit, onDelete, onRestart, disabled, faded,
+}: {
+  message: Msg
+  onEdit: (text: string) => void
+  onDelete: () => void
+  /** Rejoue ce message seul, dans une conversation neuve. */
+  onRestart?: () => void
+  disabled?: boolean
+  faded?: boolean
+}) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(message.content)
   const ref = useRef<HTMLTextAreaElement>(null)
@@ -225,6 +236,13 @@ export const UserMessage = memo(function UserMessage({
           onClick={() => navigator.clipboard.writeText(message.content)} />
         <MorphButton idle={Pencil} hover={Pencil} size="icon-sm" title="Modifier et renvoyer"
           disabled={disabled} onClick={() => setEditing(true)} />
+        {onRestart && (
+          <MorphButton
+            idle={SquareArrowOutUpRight} hover={SquareArrowOutUpRight} size="icon-sm"
+            title="Rejouer seul, dans une conversation neuve"
+            disabled={disabled} onClick={onRestart}
+          />
+        )}
         <ShakeButton icon={Trash2} size="icon-sm" title="Supprimer" disabled={disabled} onClick={onDelete} />
       </div>
     </motion.div>

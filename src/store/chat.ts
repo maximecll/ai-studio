@@ -182,6 +182,7 @@ export const useChat = create<ChatState>((set, get) => {
     const history = await messagesOf(conversationId)
 
     const payload: Array<Pick<Message, 'role' | 'content'>> = []
+
     const preamble = [
       conv.system.trim(),
       conv.memory.trim() ? memoryBlock(conv.memory) : '',

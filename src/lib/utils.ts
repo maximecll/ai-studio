@@ -156,3 +156,17 @@ export function formatCompact(n: number): string {
   if (n < 1_000_000) return `${(n / 1000).toFixed(n < 10_000 ? 1 : 0).replace('.', ',')} k`
   return `${(n / 1_000_000).toFixed(1).replace('.', ',')} M`
 }
+
+/**
+ * Ressemblance grossière entre deux textes, sur leurs débuts normalisés.
+ * Sert à repérer qu'un message recolle une réponse déjà présente — situation
+ * où le modèle tend à la reproduire au lieu de l'exécuter.
+ */
+export function resembles(a: string, b: string, window = 240): boolean {
+  const norm = (s: string) =>
+    s.toLowerCase().replace(/```[a-z]*\n?/g, '').replace(/\s+/g, ' ').trim().slice(0, window)
+  const x = norm(a)
+  const y = norm(b)
+  if (x.length < 80 || y.length < 80) return false
+  return x.includes(y.slice(0, 120)) || y.includes(x.slice(0, 120))
+}

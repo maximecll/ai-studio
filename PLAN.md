@@ -87,6 +87,31 @@ Relevés sur MacBook Pro M3 / 16 Go (plafond GPU ≈ 12 Go) :
       à l'écran. Un panneau explique, ouvre la modale du coffre de lui-même,
       retire le composeur et le panneau de paramètres.
 
+## Recopie après changement de modèle
+
+Signalé : recoller dans une conversation le prompt qu'un premier modèle venait
+de produire fait que le second le recrache mot pour mot au lieu de l'exécuter.
+
+Mesuré contre Ollama, hors application :
+
+| Situation | Recopie |
+|---|---|
+| Prompt seul, conversation neuve | non — réponse correcte |
+| Même texte présent comme réponse précédente | **oui** |
+| + consigne système courte | oui |
+| + consigne système explicite | oui |
+| + consigne placée en fin de contexte | oui |
+| + consigne accolée au message | oui |
+
+Conclusion : effet de complétion de motif, **insensible à toute consigne**.
+Seul un contexte vierge y échappe. La note de relais que j'avais ajoutée a donc
+été retirée plutôt que livrée.
+
+- [x] Action « Rejouer seul, dans une conversation neuve » sur les messages
+      utilisateur : même modèle, mêmes réglages, historique vierge.
+- [x] Détection au moment de l'envoi : si le texte reprend une réponse déjà
+      présente, une modale explique et propose de le rejouer à part.
+
 ## En cours
 
 - [ ] **Déverrouillage par Touch ID** — l'authentificateur de plateforme est
