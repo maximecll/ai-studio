@@ -228,7 +228,7 @@ async function gpu() {
 
 /* ── Téléchargement ───────────────────────────────────────────────── */
 
-function download(url, dest, onProgress) {
+export function download(url, dest, onProgress) {
   return new Promise((ok, ko) => {
     const req = get(url, { headers: { 'user-agent': 'ai-studio' } }, (res) => {
       if ([301, 302, 307, 308].includes(res.statusCode)) {

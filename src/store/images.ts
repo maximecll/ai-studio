@@ -1,6 +1,7 @@
 /** Génération d'images. */
 import { create } from 'zustand'
 import { addMessage, db, getSettings, putImage, readImage } from '../lib/db'
+import { formatBytes } from '../lib/utils'
 import * as images from '../lib/images'
 import { activeLoras, imageModelName, modelOf } from '../lib/images'
 import type { ImageEngine, ImageParams, LoraChoice, LoraFile } from '../lib/types'
@@ -298,11 +299,21 @@ export const useImages = create<State>((set, get) => {
           if (ev.type === 'log') {
             set({ installing: { label: get().installing?.label ?? '', line: ev.line } })
           }
+          // Le téléchargement de Python se compte en dizaines de mégaoctets :
+          // sans chiffre, l'installation paraît figée.
+          if (ev.type === 'progress' && ev.total > 0) {
+            set({
+              installing: {
+                label: get().installing?.label ?? '',
+                line: `${formatBytes(ev.completed)} / ${formatBytes(ev.total)}`,
+              },
+            })
+          }
           if (ev.type === 'error') {
             toast({ title: "Installation du moteur d'images", description: ev.message, tone: 'danger' })
           }
           if (ev.type === 'done') {
-            toast({ title: "Moteur d'images installé", description: 'mflux est prêt.', tone: 'success' })
+            toast({ title: "Moteur d'images installé", description: 'Le moteur est prêt.', tone: 'success' })
           }
         }
       } catch (e) {
