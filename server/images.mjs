@@ -1,18 +1,27 @@
 /** Génération d'images. */
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { createReadStream, existsSync } from 'node:fs'
 import { mkdir, open, readdir, rm, stat } from 'node:fs/promises'
-import { homedir, totalmem } from 'node:os'
+import { arch, homedir, platform, totalmem } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
+import { promisify } from 'node:util'
+
+const execute = promisify(execFile)
+
+/** mflux repose sur MLX : puce Apple uniquement. Partout ailleurs, diffusers. */
+const APPLE = platform() === 'darwin' && arch() === 'arm64'
+export const RUNNER = APPLE ? 'mflux' : 'diffusers'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const WORKER = join(ROOT, 'scripts', 'flux_worker.py')
 
-/** Environnement Python dédié : mflux et MLX n'ont rien à faire ailleurs. */
+/** Environnement Python dédié : le moteur d'images n'a rien à faire ailleurs. */
 const VENV = process.env.STUDIO_IMAGES_VENV ?? join(ROOT, '.venv-images')
-const PYTHON = join(VENV, 'bin', 'python')
+const PYTHON = platform() === 'win32'
+  ? join(VENV, 'Scripts', 'python.exe')
+  : join(VENV, 'bin', 'python')
 
 /** Les images fraîches attendent ici que l'interface vienne les chercher. */
 const STAGING = join(homedir(), '.studio', 'images')
@@ -23,7 +32,7 @@ const LORAS = process.env.STUDIO_LORAS ?? join(homedir(), '.studio', 'loras')
 const STALE_MS = 6 * 60 * 60 * 1000
 
 // ── Catalogue ──────────────────────────────────────────────────────── `repo` est ce qu'on télécharge, `base` l'architecture que mflux doit…
-export const CATALOG = [
+const MODELS = [
   {
     id: 'flux-dev-4bit',
     /* Pic mesuré sur cette machine. */
@@ -214,7 +223,79 @@ export const CATALOG = [
     note: "Quantification plus fine, donc plus fidèle — mais 18 Go de poids et un recours probable au disque sur 16 Go de mémoire.",
     heavy: true,
   },
+  {
+    id: 'sdxl-turbo',
+    /* Estimation : poids fp16 plus les tampons de débruitage. */
+    needsRam: 8_000_000_000,
+    family: 'sdxl',
+    runner: 'diffusers',
+    name: 'SDXL Turbo',
+    variant: 'fp16',
+    repo: 'stabilityai/sdxl-turbo',
+    weightsVariant: 'fp16',
+    /* Le dépôt publie les mêmes poids en plusieurs formats : 56 Go au total,
+       6,9 Go une fois filtré. */
+    allow: ['*.json', '*.txt', '**/*.fp16.safetensors'],
+    base: null,
+    quantize: null,
+    bytes: 6_940_000_000,
+    steps: { default: 4, min: 1, max: 8 },
+    // Distillé sans branche de guidage, comme schnell.
+    guidance: null,
+    msPerStep768: 2_000,
+    loadMs: 25_000,
+    measured: false,
+    note: 'Quelques pas suffisent. Le plus rapide sur carte NVIDIA, et le seul tenable sans carte du tout.',
+    recommended: true,
+  },
+  {
+    id: 'sdxl-base',
+    /* Estimation : poids fp16 plus les tampons de débruitage. */
+    needsRam: 8_000_000_000,
+    family: 'sdxl',
+    runner: 'diffusers',
+    name: 'SDXL 1.0',
+    variant: 'fp16',
+    repo: 'stabilityai/stable-diffusion-xl-base-1.0',
+    weightsVariant: 'fp16',
+    allow: ['*.json', '*.txt', '**/*.fp16.safetensors'],
+    base: null,
+    quantize: null,
+    /* Mesuré sur l'API Hugging Face, filtres appliqués : le dépôt entier
+       pèse 77 Go, tous formats confondus. */
+    bytes: 7_110_000_000,
+    steps: { default: 30, min: 10, max: 50 },
+    guidance: { default: 5, min: 1, max: 12 },
+    msPerStep768: 1_500,
+    loadMs: 25_000,
+    measured: false,
+    note: 'La version complète : trente pas, nettement plus fine que Turbo. Demande une carte graphique.',
+  },
+  {
+    id: 'sd15',
+    /* Estimation : poids fp16 plus les tampons de débruitage. */
+    needsRam: 4_000_000_000,
+    family: 'sd15',
+    runner: 'diffusers',
+    name: 'Stable Diffusion 1.5',
+    variant: 'fp16',
+    repo: 'stable-diffusion-v1-5/stable-diffusion-v1-5',
+    weightsVariant: 'fp16',
+    allow: ['*.json', '*.txt', '**/*.fp16.safetensors'],
+    base: null,
+    quantize: null,
+    bytes: 2_740_000_000,
+    steps: { default: 25, min: 10, max: 50 },
+    guidance: { default: 7.5, min: 1, max: 15 },
+    msPerStep768: 700,
+    loadMs: 12_000,
+    measured: false,
+    note: 'Le plus léger : deux gigaoctets, quelques minutes sur processeur. Qualité d’une génération d’avant SDXL.',
+  },
 ]
+
+/** Seuls les modèles que le moteur de cette machine sait charger. */
+export const CATALOG = MODELS.filter((m) => m.runner === RUNNER)
 
 export const byId = (id) => CATALOG.find((m) => m.id === id)
 
@@ -488,6 +569,31 @@ const pulls = new Map()
 
 /* ── Installation du moteur ──────────────────────────────────────── */
 
+/** Interpréteur hôte : le nom de la commande varie d'un système à l'autre. */
+async function hostPython() {
+  const essais = platform() === 'win32'
+    ? [['py', ['-3']], ['python', []], ['python3', []]]
+    : [['python3', []], ['python', []]]
+  for (const [cmd, prefixe] of essais) {
+    try {
+      const { stdout } = await execute(cmd, [...prefixe, '-c', 'import sys;print("%d.%d"%sys.version_info[:2])'], { timeout: 10000 })
+      const [majeure, mineure] = stdout.trim().split('.').map(Number)
+      if (majeure === 3 && mineure >= 10) return { cmd, prefixe, version: stdout.trim() }
+    } catch { /* on essaie le suivant */ }
+  }
+  return null
+}
+
+/** Une carte NVIDIA change la roue PyTorch à installer — et tout le reste. */
+async function hasNvidia() {
+  try {
+    await execute('nvidia-smi', ['-L'], { timeout: 8000 })
+    return true
+  } catch {
+    return false
+  }
+}
+
 function pipInstall(send) {
   return new Promise((done) => {
     const step = (label) => send({ type: 'phase', phase: 'install', label })
@@ -514,13 +620,43 @@ function pipInstall(send) {
 
     ;(async () => {
       if (!existsSync(PYTHON)) {
-        const venv = await run('python3', ['-m', 'venv', VENV], "Création de l'environnement Python")
+        const hote = await hostPython()
+        if (!hote) {
+          send({
+            type: 'error',
+            message: 'Python 3.10 ou plus récent est introuvable. Installez-le depuis python.org, puis relancez AI Studio.',
+          })
+          return done()
+        }
+        const venv = await run(hote.cmd, [...hote.prefixe, '-m', 'venv', VENV], "Création de l'environnement Python")
         if (venv.code !== 0) {
           send({ type: 'error', message: `Environnement Python impossible à créer : ${venv.tail.slice(-300)}` })
           return done()
         }
       }
-      const pip = await run(PYTHON, ['-m', 'pip', 'install', '--upgrade', 'mflux'], 'Installation de mflux et MLX')
+
+      /* PyTorch se choisit avant le reste : la roue CUDA vient d'un autre
+         index que PyPI, et diffusers l'installerait sinon en version
+         processeur, silencieusement. */
+      if (RUNNER === 'diffusers') {
+        const cuda = await hasNvidia()
+        const args = ['-m', 'pip', 'install', '--upgrade', 'torch']
+        if (cuda) args.push('--index-url', 'https://download.pytorch.org/whl/cu124')
+        const torch = await run(PYTHON, args, cuda ? 'Installation de PyTorch (CUDA)' : 'Installation de PyTorch (processeur)')
+        if (torch.code !== 0) {
+          send({ type: 'error', message: `PyTorch n'a pas pu être installé : ${torch.tail.slice(-300)}` })
+          return done()
+        }
+      }
+
+      const paquets = RUNNER === 'mflux'
+        ? ['mflux']
+        : ['diffusers', 'transformers', 'accelerate', 'safetensors', 'sentencepiece', 'protobuf', 'peft']
+      const pip = await run(
+        PYTHON,
+        ['-m', 'pip', 'install', '--upgrade', ...paquets],
+        RUNNER === 'mflux' ? 'Installation de mflux et MLX' : 'Installation de diffusers',
+      )
       if (pip.code !== 0) {
         send({ type: 'error', message: `Installation échouée : ${pip.tail.slice(-300)}` })
         return done()
@@ -583,17 +719,18 @@ export async function handle(req, res) {
   }
 }
 
-/** Ouvre la bibliothèque dans le Finder : déposer un fichier doit rester trivial. */
+/** Ouvre la bibliothèque dans l'explorateur : déposer un fichier doit rester trivial. */
 async function reveal(res) {
   await mkdir(LORAS, { recursive: true })
-  spawn('open', [LORAS], { stdio: 'ignore', detached: true }).unref()
+  const commande = { darwin: 'open', win32: 'explorer' }[platform()] ?? 'xdg-open'
+  spawn(commande, [LORAS], { stdio: 'ignore', detached: true }).unref()
   return json(res, 200, { folder: LORAS })
 }
 
 async function status(res) {
   void sweep()
   if (!engineInstalled()) {
-    return json(res, 200, { ready: false, catalog: CATALOG, venv: VENV, busy: false })
+    return json(res, 200, { ready: false, catalog: CATALOG, venv: VENV, busy: false, backend: RUNNER })
   }
 
   const repos = CATALOG.map((m) => m.repo)
@@ -616,6 +753,8 @@ async function status(res) {
     ready: true,
     busy: generating !== null,
     engine: info.mflux,
+    backend: info.backend ?? RUNNER,
+    torch: info.torch ?? null,
     python: info.python,
     cache: info.cache,
     free: info.free,
@@ -657,7 +796,7 @@ async function pull(req, res) {
   const send = ndjson(res)
   send({ type: 'phase', phase: 'starting', label: 'Préparation', model })
 
-  const run = runWorker('pull', { repo: entry.repo, subfolder: entry.subfolder }, send)
+  const run = runWorker('pull', { repo: entry.repo, subfolder: entry.subfolder, allow: entry.allow, ignore: entry.ignore }, send)
   pulls.set(model, run)
   // Fermer l'onglet ne doit pas poursuivre un téléchargement que plus personne ne suit.
   res.on('close', () => { if (!res.writableEnded) run.kill() })
@@ -745,6 +884,7 @@ async function generate(req, res) {
     family: entry.family,
     runner: entry.runner,
     quantize: entry.quantize,
+    variant: entry.weightsVariant,
     prompt,
     steps,
     seed,

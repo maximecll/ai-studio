@@ -128,7 +128,19 @@ def partial_state(path: Path) -> dict:
     return {"partials": count, "fresh": bool(count) and (time.time() - newest) < 30}
 
 
-def repo_weight(repo: str, subfolder: str | None = None) -> int:
+def _kept(path: str, subfolder, allow, ignore) -> bool:
+    from fnmatch import fnmatch
+
+    if subfolder and not path.startswith(subfolder + "/"):
+        return False
+    if ignore and any(fnmatch(path, motif) for motif in ignore):
+        return False
+    if allow and not any(fnmatch(path, motif) for motif in allow):
+        return False
+    return True
+
+
+def repo_weight(repo: str, subfolder: str | None = None, allow=None, ignore=None) -> int:
     """Poids de ce qu'on va réellement chercher, en octets.
 
     Certains dépôts publient plusieurs quantifications côte à côte : le dépôt
@@ -139,7 +151,7 @@ def repo_weight(repo: str, subfolder: str | None = None) -> int:
 
     total = 0
     for entry in HfApi().list_repo_tree(repo, recursive=True):
-        if subfolder and not str(getattr(entry, "path", "")).startswith(subfolder + "/"):
+        if not _kept(str(getattr(entry, "path", "")), subfolder, allow, ignore):
             continue
         size = getattr(entry, "size", None)
         lfs = getattr(entry, "lfs", None)
@@ -152,14 +164,45 @@ def repo_weight(repo: str, subfolder: str | None = None) -> int:
 
 # ── info ────────────────────────────────────────────────────────────
 
-def cmd_info(job: dict) -> None:
-    import mflux  # noqa: F401  — la seule chose qui compte est qu'il s'importe
+def _backend() -> tuple[str | None, str]:
+    """Moteur réellement installé dans cet environnement.
+
+    mflux ne s'installe que sur puce Apple ; ailleurs c'est diffusers qui
+    porte la diffusion. Un seul des deux est présent à la fois.
+    """
     from importlib.metadata import version
 
+    for module, name in (("mflux", "mflux"), ("diffusers", "diffusers")):
+        try:
+            __import__(module)
+            return name, version(name)
+        except Exception:
+            continue
+    return None, "?"
+
+
+def _cuda() -> dict | None:
+    """Carte visible par torch — absente sur le chemin mflux."""
     try:
-        mflux_version = version("mflux")
+        import torch
     except Exception:
-        mflux_version = "?"
+        return None
+    try:
+        if torch.cuda.is_available():
+            props = torch.cuda.get_device_properties(0)
+            return {"device": "cuda", "name": props.name, "vram": int(props.total_memory)}
+        if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+            return {"device": "mps", "name": "Apple GPU", "vram": 0}
+    except Exception:
+        pass
+    return {"device": "cpu", "name": None, "vram": 0}
+
+
+def cmd_info(job: dict) -> None:
+    backend, engine_version = _backend()
+    if backend is None:
+        fail("Aucun moteur d'images installé dans cet environnement.", kind="engine")
+        return
 
     cached = []
     for repo in job.get("repos", []):
@@ -177,7 +220,10 @@ def cmd_info(job: dict) -> None:
     usage = shutil.disk_usage(str(cache_root().parent if cache_root().exists() else Path.home()))
     emit(
         type="info",
-        mflux=mflux_version,
+        backend=backend,
+        # `mflux` reste renseigné : c'est la version du moteur, quel qu'il soit.
+        mflux=engine_version,
+        torch=_cuda() if backend == "diffusers" else None,
         python=sys.version.split()[0],
         cache=str(cache_root()),
         free=usage.free,
@@ -193,11 +239,13 @@ def cmd_pull(job: dict) -> None:
 
     repo = job["repo"]
     subfolder = job.get("subfolder")
+    allow = job.get("allow")
+    ignore = job.get("ignore")
     target = repo_dir(repo)
 
     emit(type="phase", phase="manifest", label="Lecture du dépôt")
     try:
-        total = repo_weight(repo, subfolder)
+        total = repo_weight(repo, subfolder, allow, ignore)
     except Exception as exc:
         fail(f"Dépôt illisible : {exc}", kind="repo")
         return
@@ -246,8 +294,10 @@ def cmd_pull(job: dict) -> None:
             snapshot_download(
                 repo_id=repo,
                 max_workers=4,
-                # Un dépôt qui publie plusieurs quantifications : on ne prend que la nôtre.
-                allow_patterns=[f"{subfolder}/*"] if subfolder else None,
+                # Un dépôt qui publie plusieurs quantifications, ou des poids
+                # dans trois formats : on ne prend que ce qui servira.
+                allow_patterns=([f"{subfolder}/*"] if subfolder else None) or allow,
+                ignore_patterns=ignore,
             )
         except BaseException as exc:  # noqa: BLE001 — remonté tel quel
             error.append(exc)
@@ -573,10 +623,135 @@ def _generate_wan(job: dict) -> None:
     )
 
 
+class _Cancelled(Exception):
+    """Sortie propre de la boucle de débruitage de diffusers."""
+
+
+def _torch_target():
+    """Appareil et précision : CUDA si présent, sinon MPS, sinon le processeur."""
+    import torch
+
+    if torch.cuda.is_available():
+        return "cuda", torch.float16
+    if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+        return "mps", torch.float16
+    # Le fp16 n'est pas implémenté pour tous les noyaux CPU.
+    return "cpu", torch.float32
+
+
+def _generate_diffusers(job: dict) -> None:
+    """Chemin PyTorch — Windows, Linux, et tout ce qui n'est pas Apple."""
+    import torch
+    from diffusers import AutoPipelineForText2Image
+
+    steps = int(job.get("steps", 20))
+    started = time.monotonic()
+    device, dtype = _torch_target()
+
+    emit(type="phase", phase="loading", label="Chargement du modèle", loras=0)
+    try:
+        pipe = AutoPipelineForText2Image.from_pretrained(
+            job["repo"],
+            torch_dtype=dtype,
+            # Le dépôt publie souvent les mêmes poids en plusieurs formats ;
+            # seul le nôtre a été téléchargé, diffusers prendra celui-là.
+            variant=job.get("variant") or None,
+        )
+    except Exception as exc:
+        fail(f"Chargement impossible : {exc}", kind="load")
+        return
+
+    """
+    Discipline mémoire.
+
+    `enable_model_cpu_offload` ne garde sur le GPU que le sous-modèle en cours :
+    encodeurs de texte, transformeur puis VAE se relaient au lieu de cohabiter.
+    C'est ce qui fait tenir SDXL sur 8 Go de VRAM. Le découpage de l'attention
+    et le décodage du VAE par tuiles écrêtent les deux autres pics.
+    """
+    try:
+        if device == "cuda":
+            pipe.enable_model_cpu_offload()
+        else:
+            pipe.to(device)
+    except Exception:
+        pipe.to("cpu")
+    for reglage in ("enable_attention_slicing", "enable_vae_slicing", "enable_vae_tiling"):
+        with contextlib.suppress(Exception):
+            getattr(pipe, reglage)()
+
+    if _stop.is_set():
+        emit(type="cancelled")
+        return
+
+    emit(type="phase", phase="diffusing", label="Débruitage", steps=steps)
+    horloge = {"debut": time.monotonic(), "dernier": time.monotonic()}
+
+    def au_pas(_pipe, step, _timestep, kwargs):
+        if _stop.is_set():
+            raise _Cancelled
+        maintenant = time.monotonic()
+        emit(
+            type="step",
+            # Certains ordonnanceurs produisent un pas de plus que demandé :
+            # la barre de progression ne doit pas dépasser son total.
+            step=min(int(step) + 1, steps),
+            steps=steps,
+            stepMs=int((maintenant - horloge["dernier"]) * 1000),
+            elapsedMs=int((maintenant - horloge["debut"]) * 1000),
+        )
+        horloge["dernier"] = maintenant
+        return kwargs
+
+    # Une graine sur le processeur donne le même résultat quel que soit l'appareil.
+    appel = {
+        "prompt": job["prompt"],
+        "num_inference_steps": steps,
+        "height": int(job.get("height", 1024)),
+        "width": int(job.get("width", 1024)),
+        "generator": torch.Generator(device="cpu").manual_seed(int(job["seed"])),
+        "callback_on_step_end": au_pas,
+    }
+    if job.get("guidance") is not None:
+        appel["guidance_scale"] = float(job["guidance"])
+
+    try:
+        image = pipe(**appel).images[0]
+    except _Cancelled:
+        emit(type="cancelled")
+        return
+    except Exception as exc:
+        fail(f"Génération impossible : {exc}", kind="generate")
+        return
+
+    out = Path(job["output"])
+    try:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        image.save(out)
+    except Exception as exc:
+        fail(f"Écriture impossible : {exc}", kind="save")
+        return
+
+    peak = None
+    with contextlib.suppress(Exception):
+        if device == "cuda":
+            peak = int(torch.cuda.max_memory_allocated())
+
+    emit(
+        type="done",
+        path=str(out),
+        bytes=out.stat().st_size if out.exists() else 0,
+        ms=int((time.monotonic() - started) * 1000),
+        peak=peak,
+    )
+
+
 def cmd_generate(job: dict) -> None:
     # Wan ne passe pas par mflux : moteur distinct, chemin distinct.
     if job.get("runner") == "mlx-video":
         return _generate_wan(job)
+    if job.get("runner") == "diffusers":
+        return _generate_diffusers(job)
 
     from mflux.callbacks.instances.memory_saver import MemorySaver
     from mflux.models.common.config import ModelConfig

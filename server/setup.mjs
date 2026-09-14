@@ -35,6 +35,56 @@ function localBinary() {
   return existsSync(p) ? p : null
 }
 
+/** Emplacements où les installateurs officiels déposent Ollama. Sous Windows
+    le PATH n'est pas rafraîchi pour les processus déjà lancés : sans cette
+    liste, une installation existante passe pour absente. */
+function systemPaths() {
+  const home = homedir()
+  switch (platform()) {
+    case 'win32': {
+      const local = process.env.LOCALAPPDATA ?? join(home, 'AppData', 'Local')
+      const programs = process.env.ProgramFiles ?? 'C:\\Program Files'
+      return [
+        join(local, 'Programs', 'Ollama', 'ollama.exe'),
+        join(local, 'Ollama', 'ollama.exe'),
+        join(programs, 'Ollama', 'ollama.exe'),
+      ]
+    }
+    case 'darwin':
+      return [
+        '/Applications/Ollama.app/Contents/Resources/ollama',
+        '/usr/local/bin/ollama',
+        '/opt/homebrew/bin/ollama',
+        join(home, '.ollama', 'bin', 'ollama'),
+      ]
+    default:
+      return ['/usr/local/bin/ollama', '/usr/bin/ollama', '/bin/ollama', join(home, '.local', 'bin', 'ollama')]
+  }
+}
+
+async function pathBinary() {
+  try {
+    const { stdout } = await run(platform() === 'win32' ? 'where' : 'which', ['ollama'], { timeout: 5000 })
+    const premier = stdout.split(/\r?\n/).map((l) => l.trim()).find(Boolean)
+    return premier && existsSync(premier) ? premier : null
+  } catch {
+    return null
+  }
+}
+
+/** Binaire utilisable, avec sa provenance — l'interface en a besoin pour
+    proposer un démarrage plutôt qu'un téléchargement de 1,5 Go. */
+async function findOllama() {
+  const portable = localBinary()
+  if (portable) return { bin: portable, source: 'runtime' }
+
+  const surPath = await pathBinary()
+  if (surPath) return { bin: surPath, source: 'path' }
+
+  const connu = systemPaths().find((p) => existsSync(p))
+  return connu ? { bin: connu, source: 'system' } : null
+}
+
 /* ── Matériel ─────────────────────────────────────────────────────── */
 
 /** Puce graphique et mémoire qui lui est réellement accessible. */
@@ -122,18 +172,6 @@ function reachable() {
   }).catch(() => false)
 }
 
-/** Binaire portable, sinon une installation classique trouvée dans le PATH. */
-async function anyBinary() {
-  const local = localBinary()
-  if (local) return local
-  try {
-    const { stdout } = await run(platform() === 'win32' ? 'where' : 'which', ['ollama'], { timeout: 5000 })
-    return stdout.split(/\r?\n/)[0].trim() || null
-  } catch {
-    return null
-  }
-}
-
 function startOllama(bin) {
   if (started && started.exitCode === null) return started
   // Sous Windows, laisser Ollama rattache a notre console : sa fermeture
@@ -155,9 +193,9 @@ async function waitUp(tries = 60) {
 /** Au démarrage du serveur : Ollama installé mais éteint, on l'allume. */
 export async function ensureOllama() {
   if (await reachable()) return 'deja-lance'
-  const bin = await anyBinary()
-  if (!bin) return 'absent'
-  startOllama(bin)
+  const trouve = await findOllama()
+  if (!trouve) return 'absent'
+  startOllama(trouve.bin)
   return (await waitUp()) ? 'lance' : 'muet'
 }
 
@@ -187,13 +225,15 @@ export async function handle(req, res) {
   try {
     if (path === '/status' && req.method === 'GET') {
       const a = asset()
+      const trouve = await findOllama()
       return json(res, 200, {
         platform: platform(),
         arch: arch(),
         supported: !!a,
         asset: a?.name ?? null,
         ollamaRunning: await reachable(),
-        ollamaLocal: !!localBinary(),
+        ollamaInstalled: !!trouve,
+        ollamaSource: trouve?.source ?? null,
         totalRam: totalmem(),
         gpu: await gpu(),
       })

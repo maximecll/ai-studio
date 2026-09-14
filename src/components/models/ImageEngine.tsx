@@ -186,6 +186,7 @@ function ModelRow({ model, first }: { model: ImageModel; first: boolean }) {
 function Install() {
   const install = useImages((s) => s.install)
   const installing = useImages((s) => s.installing)
+  const engine = useImages((s) => s.engine)
 
   return (
     <div className="px-5 py-6">
@@ -194,9 +195,13 @@ function Install() {
         <div className="min-w-0 flex-1">
           <p className="t-ui font-bold">Le moteur d’images n’est pas installé</p>
           <p className="t-meta mt-1.5 text-fg-muted">
-            Ollama ne sait pas générer d’images. AI Studio s’appuie donc sur mflux, le portage MLX de FLUX,
-            qui tourne nativement sur la puce Apple. L’installation crée un environnement Python à part,
-            dans le dossier de l’application — environ 2 Go, sans rien toucher au reste du système.
+            Ollama ne sait pas générer d’images. AI Studio s’appuie donc sur{' '}
+            {engine?.backend === 'diffusers'
+              ? 'diffusers et PyTorch, avec la carte NVIDIA si elle est là, le processeur sinon'
+              : 'mflux, le portage MLX de FLUX, qui tourne nativement sur la puce Apple'}
+            . L’installation crée un environnement Python à part, dans le dossier de l’application —
+            {engine?.backend === 'diffusers' ? ' 3 à 5 Go' : ' environ 2 Go'}, sans rien toucher au reste du système.
+            Python 3.10 ou plus récent doit être présent.
           </p>
         </div>
       </div>
@@ -262,8 +267,15 @@ function LoraLibrary() {
   const library = useImages((s) => s.library)
   const folder = useImages((s) => s.loraFolder)
   const refreshLoras = useImages((s) => s.refreshLoras)
+  const engine = useImages((s) => s.engine)
 
-  useEffect(() => { void refreshLoras() }, [refreshLoras])
+  /* Sans moteur ni modèle d'images installé, un LoRA ne peut s'appliquer à
+     rien : la bibliothèque n'aurait aucun sens sur cette page. */
+  const utile = !!engine?.ready && (engine.catalog ?? []).some((m) => m.installed && m.loraTarget)
+
+  useEffect(() => { if (utile) void refreshLoras() }, [utile, refreshLoras])
+
+  if (!utile) return null
 
   return (
     <section className="overflow-hidden rounded-lg bg-surface shadow-card">
@@ -344,7 +356,14 @@ export function ImageEngine() {
           </span>
         )}
         <div className="ml-auto flex items-center gap-3">
-          {engine?.engine && <span className="font-mono text-[12px] text-fg-subtle">mflux v{engine.engine}</span>}
+          {engine?.torch?.name && (
+            <span className="t-caption text-fg-subtle">{engine.torch.name}</span>
+          )}
+          {engine?.engine && (
+            <span className="font-mono text-[12px] text-fg-subtle">
+              {engine.backend === 'diffusers' ? 'diffusers' : 'mflux'} v{engine.engine}
+            </span>
+          )}
         </div>
       </header>
 

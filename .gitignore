@@ -21,3 +21,7 @@ dist/
 .idea/
 .claude/
 tsconfig.tsbuildinfo
+
+# Cache Python du worker d'images
+__pycache__/
+*.pyc
