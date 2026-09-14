@@ -3,7 +3,7 @@
 import { createServer, request as httpRequest } from 'node:http'
 import { createServer as createSecureServer, request as httpsRequest } from 'node:https'
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
-import { extname, join, normalize, resolve } from 'node:path'
+import { extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { handle as handleBlobs } from './server/blobs.mjs'
 import { handle as handleMemory } from './server/system.mjs'
@@ -118,7 +118,7 @@ function handle(req, res) {
   const rel = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, '')
   const file = join(DIST, rel)
 
-  if (file.startsWith(DIST) && existsSync(file) && statSync(file).isFile()) return serveFile(res, file)
+  if ((file === DIST || file.startsWith(DIST + sep)) && existsSync(file) && statSync(file).isFile()) return serveFile(res, file)
 
   const index = join(DIST, 'index.html')
   if (existsSync(index)) return serveFile(res, index)

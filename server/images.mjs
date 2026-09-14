@@ -3,7 +3,7 @@ import { execFile, spawn } from 'node:child_process'
 import { createReadStream, existsSync } from 'node:fs'
 import { mkdir, open, readdir, rm, stat } from 'node:fs/promises'
 import { arch, homedir, platform, totalmem } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import { download } from './setup.mjs'
@@ -461,7 +461,7 @@ async function listLoras() {
 export function loraPath(name) {
   if (typeof name !== 'string' || !/\.safetensors$/i.test(name)) return null
   const full = join(LORAS, name)
-  return full.startsWith(resolve(LORAS) + '/') && existsSync(full) ? full : null
+  return full.startsWith(resolve(LORAS) + sep) && existsSync(full) ? full : null
 }
 
 /* ── Utilitaires de réponse ──────────────────────────────────────── */
@@ -815,7 +815,7 @@ const ID = /^[0-9a-f-]{36}$/i
 function stagedPath(id) {
   if (!ID.test(id)) return null
   const full = join(STAGING, `${id}.png`)
-  return full.startsWith(resolve(STAGING) + '/') ? full : null
+  return full.startsWith(resolve(STAGING) + sep) ? full : null
 }
 
 /* ── Routage ─────────────────────────────────────────────────────── */
@@ -1098,7 +1098,7 @@ async function remove(req, res) {
   const cache = join(hfRoot(), 'hub')
   const dir = join(cache, 'models--' + entry.repo.replace(/\//g, '--'))
   // Garde-fou : on ne supprime que sous le cache, jamais ailleurs.
-  if (!dir.startsWith(resolve(cache) + '/')) return json(res, 400, { error: 'Chemin refusé.' })
+  if (!dir.startsWith(resolve(cache) + sep)) return json(res, 400, { error: 'Chemin refusé.' })
   await rm(dir, { recursive: true, force: true })
   return json(res, 200, { removed: entry.repo })
 }
