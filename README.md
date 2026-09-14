@@ -35,6 +35,11 @@ Puis **double-cliquez** sur le lanceur de votre système :
 > `.runtime` : aucun droit administrateur, aucun `PATH` modifié. Supprimer ce
 > dossier efface tout.
 
+**git** est le seul outil qui doit déjà être là — il sert à cloner, puis à
+recevoir les mises à jour. Présent d'office sur macOS et la plupart des Linux,
+à installer sous Windows depuis [git-scm.com](https://git-scm.com/downloads).
+Le lanceur le signale s'il manque, et les réglages affichent sa version.
+
 Au premier lancement, un didacticiel vous accueille et la page **Modèles**
 détecte votre carte graphique pour vous proposer ce qui tient en mémoire.
 Aux lancements suivants, le serveur rallume Ollama tout seul s'il le trouve
@@ -72,6 +77,10 @@ recharge. Rien à taper, quel que soit le système.
 > La fenêtre attend qu'un modèle ait fini de rédiger avant de s'afficher. En
 > cas d'échec — réseau coupé, fichiers modifiés à la main — le message dit
 > pourquoi, et un bouton permet de continuer sans mettre à jour.
+
+Sans **git**, rien de tout cela n'est possible : **Réglages → Mises à jour**
+affiche alors sa version quand il est là, et un avertissement avec le lien
+d'installation quand il manque.
 
 ---
 
