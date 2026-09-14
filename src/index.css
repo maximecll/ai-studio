@@ -1,74 +1,9 @@
 @import 'tailwindcss';
 @import './fonts.css';
 
-@custom-variant dark (&:where(.dark, .dark *));
-
-/* ═══════════════════════════════════════════════════════════════════
-   Direction visuelle — « Atelier »
-   Papier chaud, encre profonde, un seul accent indigo.
-
-   Règles non négociables :
-   · 3 rayons     — pilule (actions) · 18px (cartes) · 10px (lignes)
-   · 3 graisses   — 400 texte · 500 interface · 700 titres
-   · 8 tailles    — 32 · 22 · 17 · 15 · 14 · 13 · 12 · 11
-   · 3 chromas    — accent (interactif) · positif (statut) · négatif (erreur)
-   ═══════════════════════════════════════════════════════════════════ */
+/* Direction visuelle : 3 rayons, 3 graisses, 8 tailles, 3 chromas. */
 
 :root {
-  /* Base imposée — tout le châssis porte cette couleur, sans exception */
-  --base: #fefefa;
-
-  /* Rampe neutre chaude dérivée de la base */
-  --card: #ffffff;
-  --raised: #f5f5ef;
-  --sunken: #ecece5;
-  --line: #e7e7df;
-  --line-strong: #d9d9cf;
-  --code-inline: #a8352b;
-  --ink: #16150f;
-  --ink-muted: #6c6a60;
-  --ink-subtle: #9b9a90;
-
-  --bg: var(--base);
-  --surface: var(--card);
-  --surface-2: var(--raised);
-  --surface-3: var(--sunken);
-  /* En-têtes et barres latérales : strictement la couleur de base */
-  --nav: var(--base);
-  --fg: var(--ink);
-  --fg-muted: var(--ink-muted);
-  --fg-subtle: var(--ink-subtle);
-
-  /* Accent unique, employé avec parcimonie : actif, lien, focus, curseur vivant */
-  --accent: #3a6df0;
-  --accent-hover: #3560d8;
-  --accent-fg: #ffffff;
-  --accent-ink: #3560d8;
-  --accent-wash: #ecf1fe;
-  --accent-ring: rgba(58, 109, 240, 0.18);
-
-  /* Action principale : l'encre, jamais la couleur */
-  --solid: #16150f;
-  --solid-hover: #2b2a22;
-  --solid-fg: #fefefa;
-
-  /* Statut — un vert, un rouge, une ambre. Rien d'autre. */
-  --positive: #1f7a52;
-  --positive-wash: #e9f3ed;
-  --negative: #b3261e;
-  --negative-wash: #fbecea;
-  --caution: #8a5a00;
-  --caution-wash: #fbf2df;
-
-  --lift-card: 0 1px 2px rgba(22, 21, 15, 0.04), 0 0 0 1px rgba(22, 21, 15, 0.07);
-  --lift-float: 0 1px 2px rgba(22, 21, 15, 0.06), 0 12px 32px -8px rgba(22, 21, 15, 0.16), 0 0 0 1px rgba(22, 21, 15, 0.08);
-
-  color-scheme: light;
-}
-
-/* Le sombre n'est pas un thème parallèle : mêmes rôles, même hiérarchie,
-   même distance entre chaque plan. */
-.dark {
   --base: #0c090a;
 
   --bg: var(--base);
@@ -107,6 +42,8 @@
 
   color-scheme: dark;
 }
+
+
 
 @theme inline {
   --color-bg: var(--bg);

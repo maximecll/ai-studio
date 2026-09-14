@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Download, Monitor, Moon, Sun, Trash2, Upload } from 'lucide-react'
+import { Download, Trash2, Upload } from 'lucide-react'
 import { db, deleteAllConversations, exportJSON, imagesWeight, importJSON, patchSettings } from '../../lib/db'
 import { useSettings } from '../../lib/hooks'
-import type { Theme, Transcript } from '../../lib/types'
+import type { Transcript } from '../../lib/types'
 import { cn, download, formatBytes } from '../../lib/utils'
 import { prettyModel } from '../../lib/ollama'
 import { href, navigate } from '../../lib/router'
@@ -10,12 +10,6 @@ import { useModels } from '../../store/models'
 import { toast } from '../../store/ui'
 import { Page } from '../layout/Page'
 import { Button, ConfirmModal, Dropdown, Field, Input, Switch, Textarea } from '../ui/primitives'
-
-const THEMES: Array<{ value: Theme; label: string; icon: React.ReactNode }> = [
-  { value: 'light', label: 'Clair', icon: <Sun size={16} /> },
-  { value: 'dark', label: 'Sombre', icon: <Moon size={16} /> },
-  { value: 'system', label: 'Système', icon: <Monitor size={16} /> },
-]
 
 const TRANSCRIPTS: Array<{ value: Transcript; label: string }> = [
   { value: 'normal', label: 'Normale' },
@@ -88,9 +82,6 @@ export function SettingsView() {
     <Page title="Réglages" subtitle="Tout est stocké sur cette machine.">
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <Group title="Apparence">
-          <Field label="Thème">
-            <Segmented options={THEMES} value={settings.theme} onChange={(v) => void patchSettings({ theme: v })} />
-          </Field>
           <Field label="Nom d’affichage" hint="Utilisé pour vous saluer sur la page d’accueil.">
             <Input
               value={settings.displayName}

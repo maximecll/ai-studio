@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { bootstrap } from './lib/db'
-import { useConversations, useHotkey, useMediaQuery, useSettings } from './lib/hooks'
+import { useConversations, useHotkey, useMediaQuery } from './lib/hooks'
 import { href, navigate, useRoute } from './lib/router'
 import { modKey } from './lib/utils'
 import { useUI } from './store/ui'
@@ -25,22 +25,6 @@ import { ShortcutsModal } from './components/ui/ShortcutsModal'
 import { Toasts } from './components/ui/Toasts'
 import { Onboarding } from './components/ui/Onboarding'
 
-function useThemeSync() {
-  const { theme } = useSettings()
-
-  useEffect(() => {
-    localStorage.setItem('studio.theme', theme)
-    const apply = () => {
-      const dark = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
-      document.documentElement.classList.toggle('dark', dark)
-      document.documentElement.style.backgroundColor = dark ? '#0c090a' : '#fefefa'
-    }
-    apply()
-    const mq = matchMedia('(prefers-color-scheme: dark)')
-    mq.addEventListener('change', apply)
-    return () => mq.removeEventListener('change', apply)
-  }, [theme])
-}
 
 /** Transition douce entre les vues, sans déplacer le châssis. */
 function View({ k, children }: { k: string; children: React.ReactNode }) {
@@ -69,7 +53,6 @@ export function App() {
   const refresh = useModels((s) => s.refresh)
   const models = useModels((s) => s.models)
   const stop = useChat((s) => s.stop)
-  useThemeSync()
 
   const activeId = route.name === 'conversation' ? route.id : null
   const streaming = useChat((s) => (activeId ? !!s.streams[activeId] : false))

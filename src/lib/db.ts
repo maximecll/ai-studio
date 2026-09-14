@@ -107,7 +107,6 @@ export const DEFAULT_IMAGE_PARAMS: ImageParams = {
 
 export const DEFAULT_SETTINGS: Settings = {
   id: 'app',
-  theme: 'system',
   displayName: '',
   onboarded: false,
   defaultModel: '',

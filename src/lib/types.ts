@@ -188,11 +188,9 @@ export interface Folder {
   createdAt: number
 }
 
-export type Theme = 'light' | 'dark' | 'system'
 
 export interface Settings {
   id: 'app'
-  theme: Theme
   /** Nom d'affichage, utilisé dans la salutation de l'accueil. */
   displayName: string
   /** Le didacticiel de premier lancement a été vu ou ignoré. */

@@ -342,7 +342,7 @@ export function Modal({
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="fixed inset-0 bg-black/15 backdrop-blur-[2px] dark:bg-black/65"
+            className="fixed inset-0 bg-black/65 backdrop-blur-[2px]"
             onClick={onClose}
             aria-hidden
           />

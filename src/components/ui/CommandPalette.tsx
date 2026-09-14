@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Boxes, CornerDownLeft, MessageSquare, Moon, Plus, Search, Settings as SettingsIcon,
-  Sparkles, Sun, PanelLeft, SlidersHorizontal, Monitor,
+  Boxes, CornerDownLeft, MessageSquare, Plus, Search, Settings as SettingsIcon,
+  Sparkles, PanelLeft, SlidersHorizontal,
 } from 'lucide-react'
-import { patchSettings, search as searchDb, updateConversation } from '../../lib/db'
+import { search as searchDb, updateConversation } from '../../lib/db'
 import { useSettings } from '../../lib/hooks'
 import type { SearchHit } from '../../lib/db'
 import { cn, modKey } from '../../lib/utils'
@@ -58,18 +58,6 @@ export function CommandPalette() {
       { id: 'settings', label: 'Ouvrir les réglages', icon: <SettingsIcon size={16} />, group: 'Actions', hint: `${modKey},`, run: () => navigate(href.settings()) },
       { id: 'sidebar', label: 'Afficher/masquer la barre latérale', icon: <PanelLeft size={16} />, group: 'Affichage', hint: `${modKey}B`, run: ui.toggleSidebar },
       { id: 'inspector', label: 'Afficher/masquer les paramètres', icon: <SlidersHorizontal size={16} />, group: 'Affichage', hint: `${modKey}I`, run: ui.toggleInspector },
-      {
-        id: 'theme-light', label: 'Thème clair', icon: <Sun size={16} />, group: 'Affichage',
-        keywords: 'jour blanc', run: () => void patchSettings({ theme: 'light' }),
-      },
-      {
-        id: 'theme-dark', label: 'Thème sombre', icon: <Moon size={16} />, group: 'Affichage',
-        keywords: 'nuit noir', run: () => void patchSettings({ theme: 'dark' }),
-      },
-      {
-        id: 'theme-system', label: 'Thème système', icon: <Monitor size={16} />, group: 'Affichage',
-        keywords: 'auto', run: () => void patchSettings({ theme: 'system' }),
-      },
     ]
 
     const modelCmds: Command[] = activeId
@@ -128,7 +116,7 @@ export function CommandPalette() {
 
   return (
     <div className="fixed inset-0 z-70 flex items-start justify-center p-6 pt-[12vh]">
-      <div className="fixed inset-0 bg-[#333]/25 backdrop-blur-[2px] dark:bg-black/60" onClick={() => ui.setPalette(false)} />
+      <div className="fixed inset-0 bg-[#333]/25 backdrop-blur-[2px]" onClick={() => ui.setPalette(false)} />
       <div className="relative w-full max-w-xl animate-pop overflow-hidden rounded-lg bg-surface shadow-float">
         <div className="flex h-16 items-center gap-3 border-b border-line px-5">
           <Search size={16} className="shrink-0 text-fg-subtle" />

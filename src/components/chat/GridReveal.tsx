@@ -229,7 +229,6 @@ type Scene = {
   width: number
   height: number
   scale: number
-  dark: boolean
   clock: number
   split: number
   fade: number
@@ -237,8 +236,8 @@ type Scene = {
   image: HTMLImageElement | null
 }
 
-function greyOf(tone: number, dark: boolean, clock: number) {
-  return (dark ? 30 : 228) + tone * 13 + Math.sin(clock * 1.5 + tone * 6.28) * 3
+function greyOf(tone: number, clock: number) {
+  return 30 + tone * 13 + Math.sin(clock * 1.5 + tone * 6.28) * 3
 }
 
 type Patch = {
@@ -257,7 +256,7 @@ function drawScene(s: Scene) {
   // without pixel access the grid stays grey, but the photo still fades in below
   const tint = s.hasColors ? s.fade : 0
   const shade = (grey: number, target: number) => Math.round(mix(grey, target, tint))
-  const base = greyOf(root.tone, s.dark, s.clock)
+  const base = greyOf(root.tone, s.clock)
 
   // gutters recess into this instead of cutting through to the surface behind
   ctx.fillStyle = `rgb(${Math.round(shade(base + WARM[0], root.r) * 0.92)},${Math.round(
@@ -288,7 +287,7 @@ function drawScene(s: Scene) {
     const innerH = h - top - (onBottom ? 0 : gutter)
     if (innerW <= 0 || innerH <= 0) return
 
-    const grey = greyOf(p.tone, s.dark, s.clock)
+    const grey = greyOf(p.tone, s.clock)
     ctx.fillStyle = `rgb(${shade(grey + WARM[0], p.r)},${shade(grey + WARM[1], p.g)},${shade(grey + WARM[2], p.b)})`
 
     if (rounded) {
@@ -423,7 +422,6 @@ export function GridReveal({
       width: 0,
       height: 0,
       scale: 1,
-      dark: false,
       clock: 0,
       split: 0,
       fade: 0,
@@ -435,7 +433,6 @@ export function GridReveal({
     let cancelled = false
 
     const render = (split: number, now: number) => {
-      scene.dark = document.documentElement.classList.contains('dark')
       scene.split = split
       scene.fade = loadedAt < 0 ? 0 : smoothstep(0, COLOR_MS, now - loadedAt)
       drawScene(scene)
