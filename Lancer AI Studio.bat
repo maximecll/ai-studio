@@ -70,15 +70,24 @@ if not exist "node_modules" (
 )
 
 rem ---- 3 ---- Interface ------------------------------------------------
-rem  On reconstruit si le build manque. Windows n'a pas d'equivalent simple
-rem  a `find -newer` : on se contente de l'absence, et `npm run build` reste
-rem  disponible a la main si besoin.
-if not exist "dist\index.html" (
+rem  Windows n'a pas d'equivalent simple a `find -newer` : on note le commit
+rem  construit dans dist\.build. Sans ca, un `git pull` a la main laissait
+rem  l'ancienne interface en place.
+set "REBUILD="
+set "HEADSHA="
+for /f "delims=" %%h in ('git rev-parse HEAD 2^>nul') do set "HEADSHA=%%h"
+set "BUILTSHA="
+if exist "dist\.build" set /p BUILTSHA=<"dist\.build"
+if not exist "dist\index.html" set "REBUILD=1"
+if defined HEADSHA if not "%HEADSHA%"=="%BUILTSHA%" set "REBUILD=1"
+
+if defined REBUILD (
   echo.
   echo   [ Construction de l'interface ]
   echo.
   call npm run build
   if errorlevel 1 goto :echec_build
+  if defined HEADSHA echo %HEADSHA%> "dist\.build"
 )
 
 rem ---- 4 ---- Git -----------------------------------------------------

@@ -50,6 +50,21 @@ export async function* applyUpdate(): AsyncGenerator<UpdateEvent> {
   if (buffer.trim()) yield JSON.parse(buffer) as UpdateEvent
 }
 
+/** Flux poussé par le serveur : l'état arrive dès qu'une référence distante
+    bouge, sans attendre le prochain sondage. EventSource se reconnecte seul. */
+export function watchUpdates(onStatus: (s: UpdateStatus) => void): () => void {
+  let source: EventSource | null = null
+  try {
+    source = new EventSource('/update/events')
+  } catch {
+    return () => {}
+  }
+  source.onmessage = (e) => {
+    try { onStatus(JSON.parse(e.data) as UpdateStatus) } catch { /* trame partielle */ }
+  }
+  return () => source?.close()
+}
+
 /** Le serveur redémarre : on attend qu'il réponde de nouveau. */
 export async function waitForServer(timeoutMs = 180_000): Promise<boolean> {
   const fin = Date.now() + timeoutMs

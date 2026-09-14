@@ -1,39 +1,32 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowDownToLine, CircleAlert, Loader2, RefreshCw } from 'lucide-react'
-import { applyUpdate, updateStatus, waitForServer, type UpdateStatus } from '../../lib/update'
+import { applyUpdate, waitForServer } from '../../lib/update'
 import { useChat } from '../../store/chat'
+import { doitInstaller, useUpdate } from '../../store/update'
 import { Button } from './primitives'
-
-const INTERVALLE = 30 * 60 * 1000
 
 type Etape = 'attente' | 'cours' | 'redemarrage' | 'echec' | 'manuel'
 
 /** Une version est disponible : on barre l'application tant qu'elle n'est
     pas installée. L'échappatoire n'apparaît qu'après un échec. */
 export function UpdateGate() {
-  const [status, setStatus] = useState<UpdateStatus | null>(null)
+  const status = useUpdate((s) => s.status)
+  const aInstaller = useUpdate(doitInstaller)
+  const ecarter = useUpdate((s) => s.ecarter)
+  const connect = useUpdate((s) => s.connect)
+  const refresh = useUpdate((s) => s.refresh)
+
   const [etape, setEtape] = useState<Etape>('attente')
   const [phase, setPhase] = useState('')
   const [erreur, setErreur] = useState<string | null>(null)
-  const [ignore, setIgnore] = useState(false)
-  const enCours = useRef(false)
-
-  const sonder = useCallback(async (force = false) => {
-    if (enCours.current) return
-    try {
-      setStatus(await updateStatus(force))
-    } catch { /* serveur de développement sans la route : on se tait */ }
-  }, [])
 
   useEffect(() => {
-    void sonder()
-    const id = setInterval(() => void sonder(), INTERVALLE)
-    return () => clearInterval(id)
-  }, [sonder])
+    void refresh()
+    return connect()
+  }, [connect, refresh])
 
   const installer = async () => {
-    enCours.current = true
     setEtape('cours')
     setErreur(null)
     setPhase('Préparation')
@@ -43,11 +36,10 @@ export function UpdateGate() {
         if (ev.type === 'error') {
           setErreur(ev.message)
           setEtape('echec')
-          enCours.current = false
           return
         }
         if (ev.type === 'done') {
-          if (!ev.restart) { setEtape('manuel'); enCours.current = false; return }
+          if (!ev.restart) { setEtape('manuel'); return }
           setEtape('redemarrage')
           setPhase('Redémarrage')
           if (await waitForServer()) location.reload()
@@ -55,7 +47,6 @@ export function UpdateGate() {
             setErreur("Le serveur n'est pas revenu. Relancez AI Studio à la main.")
             setEtape('echec')
           }
-          enCours.current = false
           return
         }
       }
@@ -65,14 +56,13 @@ export function UpdateGate() {
       setErreur((e as Error).message)
       setEtape('echec')
     }
-    enCours.current = false
   }
 
   /* Une réponse en cours de génération passerait à la trappe au redémarrage :
      on attend qu'elle soit terminée pour barrer l'écran. */
   const genere = useChat((s) => Object.keys(s.streams).length > 0)
 
-  const visible = !ignore && !genere && !!status?.repo && (status.behind ?? 0) > 0
+  const visible = aInstaller && (!genere || etape !== 'attente')
   const commits = status?.commits ?? []
 
   return (
@@ -133,7 +123,7 @@ export function UpdateGate() {
 
             <div className="mt-6 flex items-center justify-end gap-2">
               {etape === 'echec' && (
-                <Button variant="quiet" size="sm" onClick={() => setIgnore(true)}>
+                <Button variant="quiet" size="sm" onClick={ecarter}>
                   Continuer sans mettre à jour
                 </Button>
               )}

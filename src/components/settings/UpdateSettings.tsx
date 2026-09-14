@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react'
-import { CircleAlert, CircleCheck, RefreshCw } from 'lucide-react'
-import { updateStatus, type UpdateStatus } from '../../lib/update'
+import { CircleAlert, CircleCheck, RefreshCw, Sparkles } from 'lucide-react'
 import { toast } from '../../store/ui'
+import { useUpdate } from '../../store/update'
 import { Button } from '../ui/primitives'
 
 function Ligne({ label, children }: { label: string; children: React.ReactNode }) {
@@ -13,30 +12,30 @@ function Ligne({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-/** Contenu du bloc « Mises à jour » des réglages. */
+/** Contenu du bloc « Mises à jour » des réglages. L'état vient du même
+    magasin que la fenêtre bloquante : rafraîchir ici la fait apparaître. */
 export function UpdateSettings() {
-  const [status, setStatus] = useState<UpdateStatus | null>(null)
-  const [occupe, setOccupe] = useState(false)
+  const status = useUpdate((s) => s.status)
+  const chargement = useUpdate((s) => s.chargement)
+  const refresh = useUpdate((s) => s.refresh)
 
-  useEffect(() => { void updateStatus().then(setStatus).catch(() => setStatus(null)) }, [])
-
-  const verifier = async () => {
-    setOccupe(true)
-    try {
-      const s = await updateStatus(true)
-      setStatus(s)
-      if (!s.git) toast({ title: 'git est introuvable', description: s.reason, tone: 'danger' })
-      else if (!s.repo) toast({ title: 'Mises à jour indisponibles', description: s.reason, tone: 'danger' })
-      else if (s.behind > 0) {
-        toast({ title: `${s.behind} mise${s.behind > 1 ? 's' : ''} à jour disponible${s.behind > 1 ? 's' : ''}`, description: 'Rechargez la page pour l’installer.' })
-      } else toast({ title: 'AI Studio est à jour', tone: 'success' })
-    } catch {
-      toast({ title: 'Vérification impossible', description: 'Le serveur n’a pas répondu.', tone: 'danger' })
+  const rafraichir = async () => {
+    const s = await refresh(true)
+    if (!s) return toast({ title: 'Vérification impossible', description: 'Le serveur n’a pas répondu.', tone: 'danger' })
+    if (!s.git) return toast({ title: 'git est introuvable', description: s.reason, tone: 'danger' })
+    if (!s.repo) return toast({ title: 'Mises à jour indisponibles', description: s.reason, tone: 'danger' })
+    if (s.behind > 0) {
+      return toast({
+        title: `${s.behind} nouveauté${s.behind > 1 ? 's' : ''}`,
+        description: 'La fenêtre d’installation vient de s’ouvrir.',
+      })
     }
-    setOccupe(false)
+    toast({ title: 'AI Studio est à jour', tone: 'success' })
   }
 
   const absent = status !== null && status.git === false
+  const suivi = !!status?.repo && !!status.upstream
+  const retard = status?.behind ?? 0
 
   return (
     <div className="space-y-4">
@@ -44,19 +43,27 @@ export function UpdateSettings() {
         <p className="t-caption text-fg-subtle">Relevé en cours…</p>
       ) : (
         <>
-          <Ligne label="git">
-            {absent ? (
-              <span className="inline-flex items-center gap-1.5 text-negative">
-                <CircleAlert className="size-3.5" />
-                introuvable
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5">
-                <CircleCheck className="size-3.5 text-positive" />
-                <span className="font-mono text-[12px]">{status.gitVersion ?? 'présent'}</span>
-              </span>
-            )}
-          </Ligne>
+          {suivi && (
+            <p
+              className={`t-caption flex items-start gap-2 rounded-sm px-3 py-2.5 ${
+                retard > 0 ? 'bg-accent-wash text-fg' : 'bg-surface-2 text-fg-muted'
+              }`}
+            >
+              {retard > 0 ? (
+                <>
+                  <Sparkles className="mt-0.5 size-4 shrink-0 text-accent" />
+                  <span className="min-w-0">
+                    {retard} version{retard > 1 ? 's' : ''} en attente d’installation.
+                  </span>
+                </>
+              ) : (
+                <>
+                  <CircleCheck className="mt-0.5 size-4 shrink-0 text-positive" />
+                  <span className="min-w-0">AI Studio est à la dernière version.</span>
+                </>
+              )}
+            </p>
+          )}
 
           {status.head && (
             <Ligne label="Version installée">
@@ -64,11 +71,16 @@ export function UpdateSettings() {
             </Ligne>
           )}
 
-          {status.repo && status.upstream && (
-            <Ligne label="État">
-              {status.behind > 0 ? `${status.behind} en attente` : 'À jour'}
-            </Ligne>
-          )}
+          <Ligne label="git">
+            {absent ? (
+              <span className="inline-flex items-center gap-1.5 text-negative">
+                <CircleAlert className="size-3.5" />
+                introuvable
+              </span>
+            ) : (
+              <span className="font-mono text-[12px]">{status.gitVersion ?? 'présent'}</span>
+            )}
+          </Ligne>
 
           {status.reason && (
             <p className={`t-caption flex items-start gap-2 rounded-sm px-3 py-2.5 text-fg-muted ${absent ? 'bg-negative-wash' : 'bg-surface-2'}`}>
@@ -95,9 +107,9 @@ export function UpdateSettings() {
         </>
       )}
 
-      <Button variant="soft" size="sm" disabled={occupe} onClick={() => void verifier()}>
-        <RefreshCw className={occupe ? 'size-4 animate-spin' : 'size-4'} />
-        Vérifier maintenant
+      <Button variant="soft" size="sm" disabled={chargement} onClick={() => void rafraichir()}>
+        <RefreshCw className={chargement ? 'size-4 animate-spin' : 'size-4'} />
+        Rafraîchir
       </Button>
     </div>
   )

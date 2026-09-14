@@ -77,6 +77,15 @@ git merge --ff-only → npm install (si besoin) → npm run build → redémarra
 Le serveur se termine avec le code `75`, le lanceur le rallume, la page se
 recharge. Rien à taper, quel que soit le système.
 
+**La fenêtre arrive en quelques secondes.** Le serveur surveille la référence
+distante (`git ls-remote`, une ligne sur le réseau) et pousse l'information à
+l'application par un flux d'événements — pas de sondage à l'aveugle. Un onglet
+ouvert au moment d'un `git push` voit la fenêtre apparaître sans rien toucher.
+
+**Réglages → Mises à jour** indique si l'application est à la dernière version,
+avec un bouton **Rafraîchir** : s'il trouve du nouveau, la fenêtre d'installation
+s'ouvre aussitôt.
+
 > [!NOTE]
 > La fenêtre attend qu'un modèle ait fini de rédiger avant de s'afficher. En
 > cas d'échec — réseau coupé, fichiers modifiés à la main — le message dit
