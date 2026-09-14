@@ -55,7 +55,7 @@ async function upstreamOf() {
   }
 }
 
-async function status() {
+async function status(fetch = true) {
   const outil = await gitVersion()
   const socle = {
     git: outil.ok,
@@ -80,7 +80,7 @@ async function status() {
   if (!upstream) return { ...socle, repo: true, upstream: null, reason: 'Branche locale sans dépôt distant.' }
 
   // Un dépôt injoignable ne doit pas bloquer la réponse : on garde l'état connu.
-  try { await git(['fetch', '--quiet', '--no-tags'], 25000) } catch { /* hors ligne */ }
+  if (fetch) try { await git(['fetch', '--quiet', '--no-tags'], 25000) } catch { /* hors ligne */ }
 
   const [behind, dirty, log, head] = await Promise.all([
     git(['rev-list', '--count', `HEAD..${upstream}`]),
@@ -154,6 +154,7 @@ async function apply(res) {
     await exec(NPM, ['run', 'build'], (line) => send({ type: 'log', line }))
 
     cache = { at: 0, body: null }
+    distantConnu = null
     const restart = supervised()
     send({ type: 'done', restart, head: (await git(['rev-parse', '--short', 'HEAD'])).stdout.trim() })
     res.end()
@@ -164,6 +165,83 @@ async function apply(res) {
     send({ type: 'error', message: e.message })
     res.end()
   }
+}
+
+/* ── Veille ───────────────────────────────────────────────────────── */
+
+/** `git ls-remote` ne transfère qu'une ligne : on peut sonder souvent. Le
+    `git fetch`, lui, n'a lieu que lorsque la référence distante a bougé. */
+const VEILLE = 15_000
+
+const abonnes = new Set()
+let minuteur = null
+let distantConnu = null
+
+async function relever(fetch = true) {
+  const body = await status(fetch)
+  cache = { at: Date.now(), body }
+  return body
+}
+
+async function teteDistante(upstream) {
+  const coupe = upstream.indexOf('/')
+  const remote = upstream.slice(0, coupe)
+  const branche = upstream.slice(coupe + 1)
+  const { stdout } = await git(['ls-remote', '--exit-code', remote, `refs/heads/${branche}`], 20000)
+  return stdout.split(/\s+/)[0] || null
+}
+
+function diffuser(body) {
+  const trame = `data: ${JSON.stringify(body)}\n\n`
+  for (const res of [...abonnes]) {
+    try { res.write(trame) } catch { abonnes.delete(res) }
+  }
+}
+
+async function veiller() {
+  try {
+    const base = cache.body?.repo ? cache.body : await relever(false)
+    if (!base.repo || !base.upstream) return
+    const distant = await teteDistante(base.upstream)
+    if (!distant || distant === distantConnu) return
+    distantConnu = distant
+    diffuser(await relever(true))
+  } catch { /* hors ligne, ou dépôt injoignable */ }
+}
+
+function demarrerVeille() {
+  if (minuteur) return
+  minuteur = setInterval(() => void veiller(), VEILLE)
+  minuteur.unref?.()
+  void veiller()
+}
+
+function arreterVeille() {
+  if (!abonnes.size && minuteur) { clearInterval(minuteur); minuteur = null }
+}
+
+function abonner(req, res) {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  })
+  res.write(': ouvert\n\n')
+  abonnes.add(res)
+
+  // Battement : sans trafic, certains navigateurs referment la connexion.
+  const battement = setInterval(() => { try { res.write(': .\n\n') } catch { /* fermé */ } }, 25_000)
+  battement.unref?.()
+
+  const fin = () => { clearInterval(battement); abonnes.delete(res); arreterVeille() }
+  req.on('close', fin)
+  res.on('error', fin)
+
+  const connu = cache.body && Date.now() - cache.at < 120_000 ? Promise.resolve(cache.body) : relever(true)
+  connu.then((body) => { try { res.write(`data: ${JSON.stringify(body)}\n\n`) } catch { /* fermé */ } }).catch(() => {})
+
+  demarrerVeille()
 }
 
 /* ── Routes ───────────────────────────────────────────────────────── */
@@ -186,6 +264,7 @@ export async function handle(req, res) {
       cache = { at: Date.now(), body }
       return json(res, 200, body)
     }
+    if (path === '/events' && req.method === 'GET') return void abonner(req, res)
     if (path === '/apply' && req.method === 'POST') return await apply(res)
     return json(res, 404, { error: 'Route inconnue.' })
   } catch (e) {
