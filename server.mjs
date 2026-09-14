@@ -9,6 +9,7 @@ import { handle as handleBlobs } from './server/blobs.mjs'
 import { handle as handleMemory } from './server/system.mjs'
 import { handle as handleImages } from './server/images.mjs'
 import { ensureOllama, handle as handleSetup, stopOllama } from './server/setup.mjs'
+import { handle as handleUpdate } from './server/update.mjs'
 
 const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)))
 const DIST = join(ROOT, 'dist')
@@ -103,6 +104,7 @@ function handle(req, res) {
   if (req.url.startsWith('/maintenance/memory')) return void handleMemory(req, res)
   if (req.url.startsWith('/images/')) return void handleImages(req, res)
   if (req.url.startsWith('/setup/')) return void handleSetup(req, res)
+  if (req.url.startsWith('/update/')) return void handleUpdate(req, res)
 
   const url = new URL(req.url, `http://${HOST}`)
   const rel = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, '')

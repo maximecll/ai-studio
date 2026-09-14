@@ -85,9 +85,10 @@ rem  On retient le PID : a la fermeture, on n'arrete que ce serveur-la et
 rem  non tous les node.exe de la machine.
 echo.
 echo   [ Demarrage du serveur ]
+rem  scripts\serveur.bat relance le serveur apres chaque mise a jour.
 set "SRVPID="
-for /f "delims=" %%p in ('powershell -NoProfile -Command "(Start-Process node -ArgumentList 'server.mjs' -PassThru -WindowStyle Hidden).Id" 2^>nul') do set "SRVPID=%%p"
-if not defined SRVPID start "" /b node server.mjs
+for /f "delims=" %%p in ('powershell -NoProfile -Command "(Start-Process -FilePath 'scripts\serveur.bat' -PassThru -WindowStyle Hidden).Id" 2^>nul') do set "SRVPID=%%p"
+if not defined SRVPID start "" /b cmd /c "scripts\serveur.bat"
 
 rem  Attendre que le port reponde avant d'ouvrir le navigateur.
 set "PRET="

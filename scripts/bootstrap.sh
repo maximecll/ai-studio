@@ -118,10 +118,21 @@ if listening; then
   note "AI Studio tourne déjà sur $URL"
 else
   step "Démarrage du serveur"
-  node server.mjs &
+  # Le contrôle de tâches donne à la boucle son propre groupe de processus :
+  # `kill -- -$SERVER` emporte alors le node qu'elle a lancé.
+  set -m
+  (
+    while :; do
+      AI_STUDIO_SUPERVISED=1 node server.mjs
+      # 75 : le serveur vient d'appliquer une mise à jour et veut repartir.
+      [ $? -eq 75 ] || break
+      printf '\n▸ Mise à jour appliquée — redémarrage\n'
+    done
+  ) &
   SERVER=$!
+  set +m
   # Le serveur meurt avec cette fenêtre : fermer la fenêtre arrête tout.
-  trap 'kill "$SERVER" 2>/dev/null; exit 0' EXIT INT TERM
+  trap 'kill -- -"$SERVER" 2>/dev/null; kill "$SERVER" 2>/dev/null; exit 0' EXIT INT TERM
   for _ in $(seq 1 60); do listening && break; sleep 0.5; done
   listening || die "Le serveur n'a pas démarré."
 fi
