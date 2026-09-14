@@ -15,15 +15,23 @@ Clonez le dépôt, puis double-cliquez sur le lanceur de votre système :
 | Windows | `Lancer AI Studio.bat` |
 | Linux | `lancer-ai-studio.sh` |
 
-Rien à installer au préalable. Si Node.js manque, le lanceur récupère
-l'archive officielle dans `.runtime` : aucun droit administrateur, aucun
-`PATH` modifié, et supprimer le dossier efface tout.
+Rien à installer au préalable, pas une ligne de commande à taper.
 
-**Ollama** reste à installer séparément, depuis [ollama.com](https://ollama.com) :
-son installateur demande une élévation que le lanceur ne peut pas contourner.
+**Node.js** et **Ollama** sont récupérés automatiquement s'ils manquent, sous
+forme d'archives portables déposées dans `.runtime` : aucun droit
+administrateur, aucun `PATH` modifié, et supprimer ce dossier efface tout.
+Ollama s'installe depuis la page **Modèles**, qui détecte aussi votre carte
+graphique.
 
 Sur macOS, `bash scripts/install-app.sh` crée en plus une application
 double-cliquable sur le Bureau.
+
+## Ce qu'il faut savoir sur le chiffrement
+
+Une conversation verrouillée est chiffrée au repos. Le navigateur réserve
+toutefois WebCrypto aux contextes sécurisés : sur `localhost` tout fonctionne,
+mais si vous servez AI Studio à d'autres appareils du réseau **sans HTTPS**,
+le chiffrement devient indisponible sans avertissement.
 
 ## Développement
 

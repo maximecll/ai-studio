@@ -26,6 +26,11 @@ function maintenance(): PluginOption {
         const { handle } = await import('./server/images.mjs')
         await handle(req, res)
       })
+      server.middlewares.use('/setup', async (req, res) => {
+        // @ts-expect-error — module serveur en JavaScript, sans types
+        const { handle } = await import('./server/setup.mjs')
+        await handle(req, res)
+      })
     },
   }
 }
