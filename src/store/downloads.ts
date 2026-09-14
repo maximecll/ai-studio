@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { ollama } from '../lib/ollama'
+import { attachTask, cancelTask, listTasks, startTask, type TaskEvent } from '../lib/tasks'
 import { useModels } from './models'
 import { toast } from './ui'
 
@@ -22,30 +22,14 @@ export interface Download {
   error?: string
 }
 
-const PHASES: Array<[RegExp, Phase, string]> = [
-  [/^pulling manifest/i, 'manifest', 'Lecture du manifeste'],
-  [/^pulling/i, 'downloading', 'Téléchargement'],
-  [/^verifying/i, 'verifying', 'Vérification de l’empreinte'],
-  [/^writing/i, 'writing', 'Écriture sur le disque'],
-  [/^removing/i, 'writing', 'Nettoyage des couches inutilisées'],
-  [/^success/i, 'done', 'Terminé'],
-]
-
-function describe(status: string): { phase: Phase; label: string } {
-  for (const [re, phase, label] of PHASES) {
-    if (re.test(status)) return { phase, label }
-  }
-  return { phase: 'downloading', label: status }
-}
-
 interface State {
   items: Record<string, Download>
   start: (model: string) => Promise<void>
   cancel: (model: string) => void
   dismiss: (model: string) => void
+  /** Rattache l'interface aux transferts que le serveur mène déjà. */
+  resume: () => Promise<void>
 }
-
-const controllers = new Map<string, AbortController>()
 
 export const useDownloads = create<State>((set, get) => {
   const put = (model: string, patch: Partial<Download>) => {
@@ -54,83 +38,71 @@ export const useDownloads = create<State>((set, get) => {
     set({ items: { ...get().items, [model]: { ...cur, ...patch } } })
   }
 
+  const neuf = (model: string): Download => ({
+    model, phase: 'connecting', label: 'Connexion…',
+    total: 0, completed: 0, speed: 0, eta: null, startedAt: Date.now(),
+  })
+
+  /** Consomme un flux de tâche, qu'il vienne d'un démarrage ou d'une reprise. */
+  const suivre = async (name: string, flux: AsyncGenerator<TaskEvent>) => {
+    try {
+      for await (const ev of flux) {
+        if (ev.type === 'progress') {
+          put(name, {
+            phase: (ev.phase as Phase) ?? 'downloading',
+            label: (ev.label as string) ?? 'Téléchargement',
+            total: (ev.total as number) ?? 0,
+            completed: (ev.completed as number) ?? 0,
+            speed: (ev.speed as number) ?? 0,
+            eta: (ev.eta as number | null) ?? null,
+          })
+        }
+        if (ev.type === 'error') {
+          put(name, { phase: 'error', label: 'Échec', error: ev.message as string, finishedAt: Date.now() })
+          toast({ title: 'Téléchargement impossible', description: ev.message as string, tone: 'danger' })
+          return
+        }
+        if (ev.type === 'done') {
+          put(name, { phase: 'done', label: 'Terminé', finishedAt: Date.now(), eta: 0, speed: 0 })
+          toast({ title: 'Modèle installé', description: name, tone: 'success' })
+          await useModels.getState().refresh()
+          // On laisse la ligne visible un instant, puis elle s'efface.
+          setTimeout(() => get().dismiss(name), 6000)
+          return
+        }
+      }
+      // Flux clos sans verdict : la tâche a été annulée.
+      get().dismiss(name)
+    } catch (e) {
+      put(name, { phase: 'error', label: 'Échec', error: (e as Error).message, finishedAt: Date.now() })
+    }
+  }
+
   return {
     items: {},
 
     async start(model) {
       const name = model.trim()
       if (!name || get().items[name]?.phase === 'downloading') return
+      set({ items: { ...get().items, [name]: neuf(name) } })
+      await suivre(name, startTask('llm', name))
+    },
 
-      const controller = new AbortController()
-      controllers.set(name, controller)
-      set({
-        items: {
-          ...get().items,
-          [name]: {
-            model: name, phase: 'connecting', label: 'Connexion…',
-            total: 0, completed: 0, speed: 0, eta: null, startedAt: Date.now(),
-          },
-        },
-      })
-
-      /* Ollama annonce les couches une par une : on somme pour obtenir
-         une progression globale plutôt qu'un pourcentage qui repart à zéro. */
-      const layers = new Map<string, { total: number; completed: number }>()
-      let lastAt = Date.now()
-      let lastBytes = 0
-      let speed = 0
-
-      try {
-        for await (const ev of ollama.pull(name, controller.signal)) {
-          if (ev.error) throw new Error(ev.error)
-
-          if (ev.digest && ev.total) {
-            layers.set(ev.digest, { total: ev.total, completed: ev.completed ?? 0 })
-          }
-          let total = 0
-          let completed = 0
-          for (const l of layers.values()) {
-            total += l.total
-            completed += l.completed
-          }
-
-          const now = Date.now()
-          const dt = (now - lastAt) / 1000
-          if (dt > 0.4) {
-            const instant = Math.max(0, completed - lastBytes) / dt
-            // Lissage exponentiel : une estimation stable vaut mieux qu'exacte.
-            speed = speed ? speed * 0.7 + instant * 0.3 : instant
-            lastAt = now
-            lastBytes = completed
-          }
-
-          const { phase, label } = describe(ev.status ?? '')
-          put(name, {
-            phase, label, total, completed, speed,
-            eta: speed > 0 && total > completed ? (total - completed) / speed : null,
-          })
-        }
-
-        put(name, { phase: 'done', label: 'Terminé', finishedAt: Date.now(), eta: 0, speed: 0 })
-        toast({ title: 'Modèle installé', description: name, tone: 'success' })
-        await useModels.getState().refresh()
-        // On laisse la ligne visible un instant, puis elle s'efface.
-        setTimeout(() => get().dismiss(name), 6000)
-      } catch (e) {
-        const err = e as Error
-        if (err.name === 'AbortError') {
-          get().dismiss(name)
-          return
-        }
-        put(name, { phase: 'error', label: 'Échec', error: err.message, finishedAt: Date.now() })
-        toast({ title: 'Téléchargement impossible', description: err.message, tone: 'danger' })
-      } finally {
-        controllers.delete(name)
+    /* Le transfert vit côté serveur : reprendre après un rafraîchissement ne
+       consiste qu'à se rebrancher sur son flux. */
+    async resume() {
+      for (const tache of await listTasks()) {
+        if (tache.kind !== 'llm' || tache.done) continue
+        const name = tache.label
+        if (get().items[name]) continue
+        set({ items: { ...get().items, [name]: { ...neuf(name), startedAt: tache.startedAt } } })
+        void suivre(name, attachTask(tache.id))
       }
     },
 
     cancel(model) {
-      controllers.get(model)?.abort()
+      void cancelTask(`llm:${model}`)
+      get().dismiss(model)
     },
 
     dismiss(model) {

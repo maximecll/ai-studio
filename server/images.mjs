@@ -7,6 +7,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import { download } from './setup.mjs'
+import { attach, isRunning, start } from './tasks.mjs'
 import { promisify } from 'node:util'
 
 const execute = promisify(execFile)
@@ -670,6 +671,28 @@ async function hasNvidia() {
   }
 }
 
+/**
+ * Un échec d'écriture qui survit à la reconstruction de l'environnement n'est
+ * plus un fichier verrouillé. Sous Windows, la cause courante est l'accès
+ * contrôlé aux dossiers, qui protège `Documents` et refuse l'écriture aux
+ * programmes qu'il ne connaît pas — sans que rien ne le dise clairement.
+ */
+async function expliquerPip(tail) {
+  const brut = tail.slice(-300)
+  if (platform() !== 'win32' || !VERROUILLE.test(tail)) return brut
+  try {
+    const { stdout } = await execute('powershell', ['-NoProfile', '-Command',
+      '(Get-MpPreference).EnableControlledFolderAccess'], { timeout: 15000 })
+    if (stdout.trim() === '1') {
+      return `${brut}\n\nL'accès contrôlé aux dossiers de Windows est actif : il bloque l'écriture dans Documents, Images et Bureau. Autorisez AI Studio dans Sécurité Windows, ou déplacez le dossier du projet hors de Documents.`
+    }
+  } catch { /* Defender absent ou muet */ }
+  return brut
+}
+
+/** Signatures d'un fichier verrouillé ou à demi écrit, selon le système. */
+const VERROUILLE = /check the permissions|permission denied|access is denied|winerror 5|winerror 32|being used by another process/i
+
 function pipInstall(send) {
   return new Promise((done) => {
     const step = (label) => send({ type: 'phase', phase: 'install', label })
@@ -731,16 +754,35 @@ function pipInstall(send) {
         }
       }
 
+      // pip se met à jour lui-même en premier : les vieilles versions
+      // remplacent mal un fichier déjà présent, surtout sous Windows.
+      await run(PYTHON, ['-m', 'pip', 'install', '--upgrade', 'pip'], 'Mise à jour de pip')
+
       const paquets = RUNNER === 'mflux'
         ? ['mflux']
         : ['diffusers', 'transformers', 'accelerate', 'safetensors', 'sentencepiece', 'protobuf', 'peft']
-      const pip = await run(
-        PYTHON,
-        ['-m', 'pip', 'install', '--upgrade', ...paquets],
-        RUNNER === 'mflux' ? 'Installation de mflux et MLX' : 'Installation de diffusers',
-      )
+      const etiquette = RUNNER === 'mflux' ? 'Installation de mflux et MLX' : 'Installation de diffusers'
+
+      let pip = await run(PYTHON, ['-m', 'pip', 'install', '--upgrade', ...paquets], etiquette)
+
+      /* « Check the permissions » ne vient presque jamais des droits : un
+         fichier d'un essai précédent est encore verrouillé, ou à moitié
+         écrit. Refaire l'environnement coûte moins cher que d'expliquer. */
+      if (pip.code !== 0 && VERROUILLE.test(pip.tail)) {
+        send({ type: 'log', line: 'Environnement abîmé par un essai précédent — reconstruction.' })
+        await rm(VENV, { recursive: true, force: true })
+        const hote = await hostPython()
+        const neuf = await run(hote.cmd, [...hote.prefixe, '-m', 'venv', VENV], "Reconstruction de l'environnement")
+        if (neuf.code !== 0) {
+          send({ type: 'error', message: `Environnement Python impossible à recréer : ${neuf.tail.slice(-300)}` })
+          return done()
+        }
+        await run(PYTHON, ['-m', 'pip', 'install', '--upgrade', 'pip'], 'Mise à jour de pip')
+        pip = await run(PYTHON, ['-m', 'pip', 'install', '--upgrade', ...paquets], etiquette)
+      }
+
       if (pip.code !== 0) {
-        send({ type: 'error', message: `Installation échouée : ${pip.tail.slice(-300)}` })
+        send({ type: 'error', message: `Installation échouée : ${await expliquerPip(pip.tail)}` })
         return done()
       }
       send({ type: 'done' })
@@ -787,7 +829,8 @@ export async function handle(req, res) {
     if (path === '/status' && req.method === 'GET') return await status(res)
     if (path === '/loras' && req.method === 'GET') return json(res, 200, { folder: LORAS, items: await listLoras() })
     if (path === '/loras/reveal' && req.method === 'POST') return await reveal(res)
-    if (path === '/install' && req.method === 'POST') return await install(res)
+    if (path === '/install' && req.method === 'POST') return await install(req, res)
+    if (path === '/reset' && req.method === 'POST') return await resetEngine(res)
     if (path === '/pull' && req.method === 'POST') return await pull(req, res)
     if (path === '/generate' && req.method === 'POST') return await generate(req, res)
     if (path === '/cancel' && req.method === 'POST') return await cancel(req, res)
@@ -812,7 +855,11 @@ async function reveal(res) {
 async function status(res) {
   void sweep()
   if (!engineInstalled()) {
-    return json(res, 200, { ready: false, catalog: CATALOG, venv: VENV, busy: false, backend: RUNNER })
+    // Le dossier existe mais l'interpréteur n'y est pas : installation coupée.
+    return json(res, 200, {
+      ready: false, catalog: CATALOG, venv: VENV, busy: false, backend: RUNNER,
+      partial: existsSync(VENV),
+    })
   }
 
   const repos = CATALOG.map((m) => m.repo)
@@ -826,6 +873,8 @@ async function status(res) {
       catalog: CATALOG,
       venv: VENV,
       busy: false,
+      // Un moteur qui ne répond pas est un reste d'installation, pas un moteur.
+      partial: true,
       error: `Moteur présent mais inutilisable (code ${code}). ${lastLines(tail, 2)}`.trim(),
     })
   }
@@ -862,10 +911,27 @@ async function status(res) {
   })
 }
 
-async function install(res) {
-  const send = ndjson(res)
-  await pipInstall(send)
-  res.end()
+/** Détachée de la requête : rafraîchir la page n'interrompt rien.
+    `fresh` jette l'environnement avant de repartir — ce qu'il faut après une
+    installation coupée au milieu. */
+async function install(req, res) {
+  const { fresh } = await readBody(req).catch(() => ({}))
+  const job = start('engine', 'engine', "Moteur d'images", async (send) => {
+    if (fresh) {
+      send({ type: 'phase', phase: 'install', label: 'Effacement de l’installation précédente' })
+      await rm(VENV, { recursive: true, force: true })
+    }
+    await pipInstall(send)
+  })
+  return attach(job, res)
+}
+
+/** Efface l'environnement du moteur, sans rien toucher aux modèles déjà
+    téléchargés : ils vivent dans le cache Hugging Face. */
+async function resetEngine(res) {
+  if (isRunning('engine')) return json(res, 409, { error: 'Une installation est en cours.' })
+  await rm(VENV, { recursive: true, force: true })
+  return json(res, 200, { ok: true })
 }
 
 async function pull(req, res) {
@@ -873,22 +939,20 @@ async function pull(req, res) {
   const entry = byId(model)
   if (!entry) return json(res, 400, { error: 'Modèle inconnu.' })
   if (!engineInstalled()) return json(res, 409, { error: "Le moteur d'images n'est pas installé." })
-  if (pulls.has(model)) return json(res, 409, { error: 'Téléchargement déjà en cours.' })
+  // Pas de refus si un transfert tourne déjà : `start` rend celui-là, et
+  // l'onglet qui revient d'un rafraîchissement retrouve sa progression.
+  const job = start(`image:${model}`, 'image', `${entry.name} ${entry.variant}`, async (send, signal) => {
+    send({ type: 'phase', phase: 'starting', label: 'Préparation', model })
+    const run = runWorker('pull', { repo: entry.repo, subfolder: entry.subfolder, allow: entry.allow, ignore: entry.ignore }, send)
+    pulls.set(model, run)
+    signal.addEventListener('abort', () => run.kill(), { once: true })
 
-  const send = ndjson(res)
-  send({ type: 'phase', phase: 'starting', label: 'Préparation', model })
-
-  const run = runWorker('pull', { repo: entry.repo, subfolder: entry.subfolder, allow: entry.allow, ignore: entry.ignore }, send)
-  pulls.set(model, run)
-  // Fermer l'onglet ne doit pas poursuivre un téléchargement que plus personne ne suit.
-  res.on('close', () => { if (!res.writableEnded) run.kill() })
-
-  const outcome = await run.done
-  pulls.delete(model)
-  if (outcome.code !== 0 && !res.writableEnded) {
-    send({ type: 'error', message: explainFailure(outcome, entry) })
-  }
-  res.end()
+    const outcome = await run.done
+    pulls.delete(model)
+    if (outcome.code !== 0) send({ type: 'error', message: explainFailure(outcome, entry) })
+    else send({ type: 'done', model })
+  })
+  return attach(job, res)
 }
 
 async function generate(req, res) {

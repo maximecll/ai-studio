@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Check, Cpu, Download, FolderOpen, HardDrive, Image as ImageIcon, Layers, Loader2,
-  RefreshCw, Trash2, TriangleAlert, X,
+  RefreshCw, RotateCcw, Trash2, TriangleAlert, X,
 } from 'lucide-react'
 import { estimate, purgeChunkCache, revealLoras, roughly } from '../../lib/images'
 import type { ImageModel, LoraFile } from '../../lib/types'
@@ -187,13 +187,16 @@ function Install() {
   const install = useImages((s) => s.install)
   const installing = useImages((s) => s.installing)
   const engine = useImages((s) => s.engine)
+  const coupee = !!engine?.partial
 
   return (
     <div className="px-5 py-6">
       <div className="flex items-start gap-3">
         <Cpu className="mt-0.5 size-4 shrink-0 text-fg-subtle" />
         <div className="min-w-0 flex-1">
-          <p className="t-ui font-bold">Le moteur d’images n’est pas installé</p>
+          <p className="t-ui font-bold">
+            {coupee ? 'L’installation du moteur est incomplète' : 'Le moteur d’images n’est pas installé'}
+          </p>
           <p className="t-meta mt-1.5 text-fg-muted">
             Ollama ne sait pas générer d’images. AI Studio s’appuie donc sur{' '}
             {engine?.backend === 'diffusers'
@@ -219,10 +222,26 @@ function Install() {
           )}
         </div>
       ) : (
-        <Button variant="primary" size="sm" className="mt-4" onClick={() => void install()}>
-          <Download className="size-4" />
-          Installer le moteur
-        </Button>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Button variant="primary" size="sm" onClick={() => void install(false)}>
+            <Download className="size-4" />
+            {coupee ? 'Reprendre l’installation' : 'Installer le moteur'}
+          </Button>
+          {coupee && (
+            <Button variant="soft" size="sm" onClick={() => void install(true)}>
+              <RotateCcw className="size-4" />
+              Repartir de zéro
+            </Button>
+          )}
+        </div>
+      )}
+
+      {coupee && !installing && (
+        <p className="t-caption mt-3 text-caution">
+          Une installation précédente s’est arrêtée en chemin. Reprendre réutilise ce qui est déjà là ;
+          repartir de zéro efface l’environnement et le reconstruit — les modèles déjà téléchargés ne
+          sont pas touchés.
+        </p>
       )}
     </div>
   )

@@ -31,6 +31,15 @@ function maintenance(): PluginOption {
         const { handle } = await import('./server/setup.mjs')
         await handle(req, res)
       })
+      server.middlewares.use('/tasks', async (req, res) => {
+        // @ts-expect-error — modules serveur en JavaScript, sans types
+        const { routes } = await import('./server/tasks.mjs')
+        // @ts-expect-error — idem
+        const { pullModel } = await import('./server/pull.mjs')
+        // @ts-expect-error — idem
+        const { start } = await import('./server/tasks.mjs')
+        await routes({ llm: (m: string) => start(`llm:${m}`, 'llm', m, pullModel(m)) })(req, res)
+      })
       server.middlewares.use('/update', async (req, res) => {
         // @ts-expect-error — module serveur en JavaScript, sans types
         const { handle } = await import('./server/update.mjs')

@@ -10,6 +10,8 @@ import { handle as handleMemory } from './server/system.mjs'
 import { handle as handleImages } from './server/images.mjs'
 import { ensureOllama, handle as handleSetup, stopOllama } from './server/setup.mjs'
 import { handle as handleUpdate } from './server/update.mjs'
+import { routes as taskRoutes, start as startTask } from './server/tasks.mjs'
+import { pullModel } from './server/pull.mjs'
 
 const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)))
 const DIST = join(ROOT, 'dist')
@@ -97,6 +99,11 @@ function serveFile(res, file, status = 200) {
   createReadStream(file).pipe(res)
 }
 
+/** Les genres de tâches qu'un client peut lancer lui-même. */
+const handleTasks = taskRoutes({
+  llm: (model) => startTask(`llm:${model}`, 'llm', model, pullModel(model)),
+})
+
 function handle(req, res) {
   if (req.url.startsWith('/ollama')) return proxy(req, res)
   if (req.url.startsWith('/hf')) return proxyHuggingFace(req, res)
@@ -105,6 +112,7 @@ function handle(req, res) {
   if (req.url.startsWith('/images/')) return void handleImages(req, res)
   if (req.url.startsWith('/setup/')) return void handleSetup(req, res)
   if (req.url.startsWith('/update/')) return void handleUpdate(req, res)
+  if (req.url === '/tasks' || req.url.startsWith('/tasks/')) return void handleTasks(req, res)
 
   const url = new URL(req.url, `http://${HOST}`)
   const rel = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, '')

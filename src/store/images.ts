@@ -1,9 +1,10 @@
 /** Génération d'images. */
 import { create } from 'zustand'
 import { addMessage, db, getSettings, putImage, readImage } from '../lib/db'
+import { attachTask, listTasks } from '../lib/tasks'
 import { formatBytes } from '../lib/utils'
 import * as images from '../lib/images'
-import { activeLoras, imageModelName, modelOf } from '../lib/images'
+import { activeLoras, imageModelName, modelOf, type EngineEvent } from '../lib/images'
 import type { ImageEngine, ImageParams, LoraChoice, LoraFile } from '../lib/types'
 import { toast } from './ui'
 
@@ -66,8 +67,10 @@ interface State {
   /** Range le message une fois la révélation jouée. Idempotent. */
   finish: (conversationId: string) => Promise<void>
   cancel: (conversationId: string) => void
-  install: () => Promise<void>
+  install: (fresh?: boolean) => Promise<void>
   pull: (model: string) => Promise<void>
+  /** Se rebrancher sur ce que le serveur mène déjà, après un rafraîchissement. */
+  resume: () => Promise<void>
   cancelPull: (model: string) => void
   remove: (model: string) => Promise<void>
 }
@@ -89,6 +92,38 @@ export const useImages = create<State>((set, get) => {
     const jobs = { ...get().jobs }
     delete jobs[id]
     set({ jobs })
+  }
+
+  /** Consomme un flux d'installation du moteur, qu'il vienne d'un démarrage
+      ou d'une reprise après rafraîchissement. */
+  const consommerInstall = async (flux: AsyncGenerator<EngineEvent>) => {
+    try {
+      for await (const ev of flux) {
+        if (ev.type === 'phase') set({ installing: { label: ev.label, line: '' } })
+        if (ev.type === 'log') set({ installing: { label: get().installing?.label ?? '', line: ev.line } })
+        // Le téléchargement de Python se compte en dizaines de mégaoctets :
+        // sans chiffre, l'installation paraît figée.
+        if (ev.type === 'progress' && ev.total > 0) {
+          set({
+            installing: {
+              label: get().installing?.label ?? '',
+              line: `${formatBytes(ev.completed)} / ${formatBytes(ev.total)}`,
+            },
+          })
+        }
+        if (ev.type === 'error') {
+          toast({ title: "Installation du moteur d'images", description: ev.message, tone: 'danger' })
+        }
+        if (ev.type === 'done') {
+          toast({ title: "Moteur d'images installé", description: 'Le moteur est prêt.', tone: 'success' })
+        }
+      }
+    } catch (e) {
+      toast({ title: "Installation du moteur d'images", description: (e as Error).message, tone: 'danger' })
+    } finally {
+      set({ installing: null })
+      await get().refresh()
+    }
   }
 
   return {
@@ -290,37 +325,24 @@ export const useImages = create<State>((set, get) => {
       running.get(conversationId)?.abort()
     },
 
-    async install() {
+    async install(fresh = false) {
       if (get().installing) return
-      set({ installing: { label: 'Préparation', line: '' } })
-      try {
-        for await (const ev of images.installEngine()) {
-          if (ev.type === 'phase') set({ installing: { label: ev.label, line: '' } })
-          if (ev.type === 'log') {
-            set({ installing: { label: get().installing?.label ?? '', line: ev.line } })
-          }
-          // Le téléchargement de Python se compte en dizaines de mégaoctets :
-          // sans chiffre, l'installation paraît figée.
-          if (ev.type === 'progress' && ev.total > 0) {
-            set({
-              installing: {
-                label: get().installing?.label ?? '',
-                line: `${formatBytes(ev.completed)} / ${formatBytes(ev.total)}`,
-              },
-            })
-          }
-          if (ev.type === 'error') {
-            toast({ title: "Installation du moteur d'images", description: ev.message, tone: 'danger' })
-          }
-          if (ev.type === 'done') {
-            toast({ title: "Moteur d'images installé", description: 'Le moteur est prêt.', tone: 'success' })
-          }
+      set({ installing: { label: fresh ? 'Effacement' : 'Préparation', line: '' } })
+      await consommerInstall(images.installEngine(fresh))
+    },
+
+    /* Rien à relancer : le travail vit côté serveur, on se rebranche dessus. */
+    async resume() {
+      for (const tache of await listTasks()) {
+        if (tache.done) continue
+        if (tache.kind === 'engine' && !get().installing) {
+          set({ installing: { label: (tache.last?.label as string) ?? 'Installation', line: '' } })
+          void consommerInstall(attachTask(tache.id) as unknown as AsyncGenerator<EngineEvent>)
         }
-      } catch (e) {
-        toast({ title: "Installation du moteur d'images", description: (e as Error).message, tone: 'danger' })
-      } finally {
-        set({ installing: null })
-        await get().refresh()
+        if (tache.kind === 'image') {
+          const model = tache.id.replace(/^image:/, '')
+          if (!get().pulls[model]) void get().pull(model)
+        }
       }
     },
 

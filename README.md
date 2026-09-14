@@ -48,6 +48,7 @@ Fermer la fenêtre du lanceur arrête le serveur et Ollama.
 | **Conversations** | Renommage, épinglage, duplication, recherche plein texte, import/export Markdown et JSON. Titres générés par le modèle. |
 | **Inférence** | Température, top-p/k, min-p, pénalités, contexte, graine, mirostat, mode réflexion — par conversation. |
 | **Presets** | Instructions système et paramètres enregistrés, applicables en un clic. |
+| **Téléchargements** | Menés par le serveur : rafraîchir la page, changer d'écran ou fermer l'onglet n'interrompt rien, la progression se retrouve au retour. |
 | **Modèles** | Recherche Hugging Face (GGUF) et bibliothèque Ollama, qui propose le plus capable de chaque famille que la carte peut porter. Téléchargement avec débit et temps restant, annulable. Chaque quantisation dit si elle tient. |
 | **Pièces jointes** | Images déposées, collées ou choisies, lues par les modèles `vision`. Badge cliquable sous le message. |
 | **Images** | Génération locale, dans le fil de conversation. Moteur et modèles selon la machine. |

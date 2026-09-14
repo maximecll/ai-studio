@@ -89,8 +89,14 @@ export function activeLoras(chosen: LoraChoice[] | undefined, library: LoraFile[
   return chosen.filter((c) => known.has(c.file))
 }
 
-export function installEngine(signal?: AbortSignal): AsyncGenerator<EngineEvent> {
-  return stream('/install', {}, signal)
+export function installEngine(fresh = false, signal?: AbortSignal): AsyncGenerator<EngineEvent> {
+  return stream('/install', { fresh }, signal)
+}
+
+/** Jette l'environnement du moteur ; les modèles téléchargés restent. */
+export async function resetEngine(): Promise<void> {
+  const res = await fetch('/images/reset', { method: 'POST' })
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `Erreur ${res.status}`)
 }
 
 export function pullModel(model: string, signal?: AbortSignal): AsyncGenerator<EngineEvent> {
