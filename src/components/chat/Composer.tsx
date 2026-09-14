@@ -122,6 +122,61 @@ export function useComposerMode(conversationId: string) {
   return [mode, choose] as const
 }
 
+/**
+ * Coquille du composeur : un tiroir, un en-tête, le champ, un pied, un statut.
+ *
+ * L'organisation vient du ChatComposer d'Astryx, dont les emplacements nommés
+ * rangent mieux que notre barre unique : la jauge de contexte remonte en
+ * en-tête, l'avertissement descend sous la carte, et le pied ne garde que les
+ * commandes. La bibliothèque elle-même n'est pas embarquée — elle pesait un
+ * tiers du paquet et restylait toute l'application.
+ */
+function ComposerShell({
+  drawer, headerContext, footerActions, sendActions, sendButton, status, survol, children, ...zone
+}: {
+  drawer?: React.ReactNode
+  headerContext?: React.ReactNode
+  footerActions: React.ReactNode
+  sendActions?: React.ReactNode
+  sendButton: React.ReactNode
+  status?: React.ReactNode
+  survol: boolean
+  children: React.ReactNode
+} & Pick<React.HTMLAttributes<HTMLDivElement>, 'onDragOver' | 'onDragLeave' | 'onDrop'>) {
+  return (
+    <>
+      <div
+        {...zone}
+        className={cn(
+          'rounded-lg bg-surface transition-shadow duration-200',
+          'shadow-card focus-within:shadow-float',
+          survol && 'ring-2 ring-accent',
+        )}
+      >
+        {drawer}
+
+        {headerContext && (
+          <div className="flex h-8 items-center justify-end px-5 pt-2">{headerContext}</div>
+        )}
+
+        {children}
+
+        {/* Groupe de gauche compressible, groupe de droite intouchable : le
+            bouton d'envoi reste dans la carte à toute largeur. */}
+        <div className="flex h-14 items-center gap-1.5 px-3">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5">{footerActions}</div>
+          <div className="flex shrink-0 items-center gap-2">
+            {sendActions}
+            {sendButton}
+          </div>
+        </div>
+      </div>
+
+      {status}
+    </>
+  )
+}
+
 export function Composer({
   conversation, settings, streaming, usedTokens, hasMemory, onSend, onGenerate, generating, onStop,
 }: {
@@ -208,7 +263,8 @@ export function Composer({
   return (
     <div className="px-6 pt-2 pb-6">
       <div className="mx-auto w-full max-w-[860px]">
-        <div
+        <ComposerShell
+          survol={survol}
           onDragOver={(e) => { if (!image) { e.preventDefault(); setSurvol(true) } }}
           onDragLeave={() => setSurvol(false)}
           onDrop={(e) => {
@@ -217,44 +273,29 @@ export function Composer({
             setSurvol(false)
             void jointes.add(e.dataTransfer.files)
           }}
-          className={cn(
-            'rounded-lg bg-surface transition-shadow duration-200',
-            'shadow-card focus-within:shadow-float',
-            survol && 'ring-2 ring-accent',
-          )}
-        >
-          <PendingStrip items={jointes.items} onRemove={jointes.remove} />
-          {aveugle && (
-            <p className="t-caption flex items-start gap-2 px-5 pt-2 text-caution">
-              <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-              {prettyModel(conversation.model ?? '')} ne lit pas les images — choisissez un modèle « vision ».
-            </p>
-          )}
-          <textarea
-            ref={ref}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onPaste={onPaste}
-            onKeyDown={onKeyDown}
-            rows={1}
-            placeholder={
-              busy
-                ? 'Génération en cours…'
-                : image
-                  ? 'Décrivez l’image à produire…'
-                  : 'Écrivez votre message…'
-            }
-            className={cn(
-              'block max-h-[40vh] min-h-12 w-full resize-none bg-transparent px-5 pt-4 pb-1',
-              'text-[15px] leading-[1.6] text-fg outline-none scroll-thin placeholder:text-fg-subtle',
-            )}
-          />
-
-          {/* Barre de pilotage : modèle, preset, contexte, envoi — tout à la même hauteur. */}
-          {/* Groupe de gauche compressible, groupe de droite intouchable :
-              le bouton d'envoi reste dans la carte à toute largeur. */}
-          <div className="flex h-14 items-center gap-1.5 px-3">
-            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          drawer={jointes.items.length ? <PendingStrip items={jointes.items} onRemove={jointes.remove} /> : undefined}
+          headerContext={
+            !image ? (
+              <Tooltip
+                label={`${formatNumber(used)} jetons sur ${formatNumber(ctxMax)} — ${Math.round(filled * 100)} % du contexte`}
+                side="top"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="h-1 w-10 overflow-hidden rounded-full bg-fg/[0.08]">
+                    <span
+                      className={cn('block h-full rounded-full transition-[width] duration-300', tight ? 'bg-caution' : 'bg-fg/35')}
+                      style={{ width: `${Math.max(3, filled * 100)}%` }}
+                    />
+                  </span>
+                  <span className={cn('font-mono text-[11px] tabular-nums whitespace-nowrap', tight ? 'text-caution' : 'text-fg-subtle')}>
+                    {formatCompact(used)} / {formatCompact(ctxMax)}
+                  </span>
+                </span>
+              </Tooltip>
+            ) : undefined
+          }
+          footerActions={
+            <>
               <ModeToggle mode={mode} onChange={setMode} ready={hasImageModel} />
               {image ? (
                 <ImageControls
@@ -276,63 +317,74 @@ export function Composer({
                   )}
                 </>
               )}
-            </div>
-
-            <div className="flex shrink-0 items-center gap-2">
-              {!image && (
-                <>
-                  <input
-                    ref={fichierRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    hidden
-                    onChange={(e) => { void jointes.add(e.target.files); e.target.value = '' }}
-                  />
-                  <Tooltip label="Joindre une image — ou la déposer ici, ou la coller" side="top">
-                    <Button size="icon-sm" onClick={() => fichierRef.current?.click()}>
-                      <Paperclip className="size-4" />
-                    </Button>
-                  </Tooltip>
-                </>
-              )}
-
-              {!image && <Tooltip
-                label={`${formatNumber(used)} jetons sur ${formatNumber(ctxMax)} — ${Math.round(filled * 100)} % du contexte`}
-                side="top"
-              >
-                <span className="hidden items-center gap-2 pr-1 sm:flex">
-                  <span className="h-1 w-10 overflow-hidden rounded-full bg-fg/[0.08]">
-                    <span
-                      className={cn('block h-full rounded-full transition-[width] duration-300', tight ? 'bg-caution' : 'bg-fg/35')}
-                      style={{ width: `${Math.max(3, filled * 100)}%` }}
-                    />
-                  </span>
-                  <span className={cn('font-mono text-[11px] tabular-nums whitespace-nowrap', tight ? 'text-caution' : 'text-fg-subtle')}>
-                    {formatCompact(used)} / {formatCompact(ctxMax)}
-                  </span>
-                </span>
-              </Tooltip>}
-
-              {busy ? (
-                <Button variant="soft" size="icon" onClick={onStop} title="Arrêter (Échap)" aria-label="Arrêter">
-                  <Square className="size-3 fill-current" />
-                </Button>
-              ) : (
-                <MorphButton
-                  idle={image ? ImageIcon : Send} hover={Check} variant="primary" size="icon"
-                  iconClassName={image ? undefined : 'translate-x-px -translate-y-px'}
-                  title={
-                    image
-                      ? 'Produire l’image'
-                      : settings.sendOnEnter ? 'Envoyer (Entrée)' : `Envoyer (${modKey}+Entrée)`
-                  }
-                  disabled={!text.trim() && (image || !jointes.files.length)} onClick={submit}
+            </>
+          }
+          sendActions={
+            !image ? (
+              <>
+                <input
+                  ref={fichierRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  hidden
+                  onChange={(e) => { void jointes.add(e.target.files); e.target.value = '' }}
                 />
-              )}
-            </div>
-          </div>
-        </div>
+                <Tooltip label="Joindre une image — ou la déposer ici, ou la coller" side="top">
+                  <Button size="icon-sm" onClick={() => fichierRef.current?.click()}>
+                    <Paperclip className="size-4" />
+                  </Button>
+                </Tooltip>
+              </>
+            ) : undefined
+          }
+          sendButton={
+            busy ? (
+              <Button variant="soft" size="icon" onClick={onStop} title="Arrêter (Échap)" aria-label="Arrêter">
+                <Square className="size-3 fill-current" />
+              </Button>
+            ) : (
+              <MorphButton
+                idle={image ? ImageIcon : Send} hover={Check} variant="primary" size="icon"
+                iconClassName={image ? undefined : 'translate-x-px -translate-y-px'}
+                title={
+                  image
+                    ? 'Produire l’image'
+                    : settings.sendOnEnter ? 'Envoyer (Entrée)' : `Envoyer (${modKey}+Entrée)`
+                }
+                disabled={!text.trim() && (image || !jointes.files.length)} onClick={submit}
+              />
+            )
+          }
+          status={
+            aveugle ? (
+              <p className="t-caption mt-2 flex items-start gap-2 px-1 text-caution">
+                <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+                {prettyModel(conversation.model ?? '')} ne lit pas les images — choisissez un modèle « vision ».
+              </p>
+            ) : undefined
+          }
+        >
+          <textarea
+            ref={ref}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onPaste={onPaste}
+            onKeyDown={onKeyDown}
+            rows={1}
+            placeholder={
+              busy
+                ? 'Génération en cours…'
+                : image
+                  ? 'Décrivez l’image à produire…'
+                  : 'Écrivez votre message…'
+            }
+            className={cn(
+              'block max-h-[40vh] min-h-12 w-full resize-none bg-transparent px-5 pt-4 pb-1',
+              'text-[15px] leading-[1.6] text-fg outline-none scroll-thin placeholder:text-fg-subtle',
+            )}
+          />
+        </ComposerShell>
       </div>
     </div>
   )
