@@ -14,9 +14,9 @@ Puis double-cliquez le lanceur de votre système :
 
 | Système | Fichier |
 | :-- | :-- |
-| macOS | `Lancer AI Studio.command` |
-| Windows | `Lancer AI Studio.bat` |
-| Linux | `lancer-ai-studio.sh` |
+| 🍎 macOS | `Lancer AI Studio.command` |
+| 🪟 Windows | `Lancer AI Studio.bat` |
+| 🐧 Linux | `lancer-ai-studio.sh` |
 
 Aucune commande ensuite. Node.js et Ollama sont téléchargés dans `.runtime` s'ils manquent — archives portables, pas de droit administrateur, pas de `PATH` modifié.
 
@@ -44,10 +44,21 @@ Fermer la fenêtre du lanceur arrête le serveur et Ollama.
 | **Presets** | Instructions système et paramètres enregistrés, applicables en un clic. |
 | **Modèles** | Recherche Hugging Face (GGUF) et bibliothèque Ollama. Téléchargement avec débit et temps restant, annulable. |
 | **Pièces jointes** | Images déposées, collées ou choisies, lues par les modèles `vision`. Badge cliquable sous le message. |
-| **Images** | FLUX.1 en local, dans le fil de conversation. |
+| **Images** | Génération locale, dans le fil de conversation. Moteur et modèles selon la machine. |
 | **Chiffrement** | Conversations verrouillables, AES-GCM au repos. |
 | **Mesures** | Entropie par jeton, perplexité, confiance, débit, latence, contexte. |
 | **Mémoire** | Au-delà de 72 % du contexte, les vieux échanges sont fondus dans un mémo Markdown modifiable. |
+
+### Selon le système
+
+Tout ce qui précède fonctionne partout. Seule la génération d'images dépend du matériel.
+
+| | 🍎 macOS Apple Silicon | 🪟 Windows · 🐧 Linux | 🍎 macOS Intel |
+| :-- | :-: | :-: | :-: |
+| Conversations, modèles, pièces jointes, chiffrement | ✅ | ✅ | ✅ |
+| Génération d'images | mflux (MLX) | diffusers (PyTorch) | diffusers, processeur |
+| Accélération | GPU intégré | NVIDIA, sinon processeur | processeur |
+| LoRAs | ✅ | — | — |
 
 ### Raccourcis
 
@@ -80,7 +91,9 @@ Le serveur sort avec le code `75`, le lanceur le relance, la page se recharge. L
 
 ## Génération d'images
 
-Ollama ne fait pas de diffusion. AI Studio utilise [mflux](https://github.com/filipstrand/mflux), le portage MLX de FLUX — **puce Apple uniquement**. Installation depuis **Modèles → Génération d'images** : environnement Python dédié dans `.venv-images` (≈ 2 Go).
+Ollama ne fait pas de diffusion. Le moteur est installé depuis **Modèles → Génération d'images**, dans un environnement Python à part (`.venv-images`). Python 3.10 ou plus récent doit être présent sur la machine.
+
+### 🍎 macOS Apple Silicon — mflux
 
 | Modèle | Poids | Pas | 1024² sur M3 16 Go |
 | :-- | --: | --: | :-- |
@@ -91,6 +104,18 @@ Ollama ne fait pas de diffusion. AI Studio utilise [mflux](https://github.com/fi
 Mesuré : 27 s par pas à 768², pic mémoire 8,0 Go. Le temps suit la surface — la définition (640² · 1024² · 1280²) est le levier principal.
 
 FLUX.1 dev est sous licence non commerciale, schnell sous Apache 2.0. Le cache Xet (≈ 10 Go) se vide depuis le panneau.
+
+### 🪟 Windows · 🐧 Linux — diffusers
+
+PyTorch est installé avec la roue CUDA si une carte NVIDIA est détectée, sinon en version processeur. Sans carte, la génération fonctionne mais se compte en minutes par image.
+
+| Modèle | Poids | Pas | Pour |
+| :-- | --: | --: | :-- |
+| SDXL Turbo | 6,9 Go | 4 | Le plus rapide, et le seul tenable sans carte |
+| SDXL 1.0 | 7,1 Go | 30 | Plus fin, demande une carte |
+| Stable Diffusion 1.5 | 2,7 Go | 25 | Le plus léger |
+
+Les LoRAs ne sont pas encore pris en charge sur ce moteur : la bibliothèque reste masquée.
 
 ## Sécurité
 
@@ -121,7 +146,7 @@ src/store/        interface, génération, inventaire des modèles, diffusion
 src/components/   layout · chat · models · settings · ui
 server.mjs        statique + relais Ollama et Hugging Face
 server/           magasin Ollama, mémoire système, installation, mises à jour
-scripts/          bootstrap · supervision · bundle macOS · flux_worker.py
+scripts/          bootstrap · supervision · bundle macOS · worker d'images
 ```
 
 Les conversations vivent dans IndexedDB (`ollama-studio`). Le streaming passe par un magasin séparé : les jetons ne touchent le disque qu'une fois la réponse terminée.
