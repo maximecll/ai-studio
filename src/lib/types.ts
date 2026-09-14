@@ -275,6 +275,10 @@ export interface ImageEngine {
   ready: boolean
   busy: boolean
   engine?: string
+  /** mflux sur puce Apple, diffusers partout ailleurs. */
+  backend?: 'mflux' | 'diffusers'
+  /** Appareil vu par PyTorch — seulement sur le chemin diffusers. */
+  torch?: { device: 'cuda' | 'mps' | 'cpu'; name: string | null; vram: number } | null
   python?: string
   cache?: string
   free?: number
