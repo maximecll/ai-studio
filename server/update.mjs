@@ -5,6 +5,7 @@ import { platform } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
+import { gitBin } from './setup.mjs'
 
 const run = promisify(execFile)
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -16,8 +17,10 @@ export const RESTART = 75
 const NPM = platform() === 'win32' ? 'npm.cmd' : 'npm'
 const SHELL = platform() === 'win32'
 
+/* `gitBin()` à chaque appel : git peut être installé en cours de session,
+   depuis les réglages. */
 const git = (args, timeout = 30000) =>
-  run('git', ['-C', ROOT, ...args], { timeout, maxBuffer: 8 << 20 })
+  run(gitBin(), ['-C', ROOT, ...args], { timeout, maxBuffer: 8 << 20 })
 
 const supervised = () => process.env.AI_STUDIO_SUPERVISED === '1'
 
@@ -35,7 +38,7 @@ let present = null
 async function gitVersion() {
   if (present) return present
   try {
-    const { stdout } = await run('git', ['--version'], { timeout: 8000 })
+    const { stdout } = await run(gitBin(), ['--version'], { timeout: 8000 })
     present = { ok: true, version: stdout.trim().replace(/^git version /, '') }
   } catch {
     return { ok: false, version: null }
@@ -142,7 +145,7 @@ async function apply(res) {
     const lockBefore = await git(['rev-parse', 'HEAD:package-lock.json']).then((r) => r.stdout.trim(), () => '')
 
     phase('Récupération des fichiers')
-    await exec('git', ['-C', ROOT, 'merge', '--ff-only', before.upstream], (line) => send({ type: 'log', line }))
+    await exec(gitBin(), ['-C', ROOT, 'merge', '--ff-only', before.upstream], (line) => send({ type: 'log', line }))
 
     const lockAfter = await git(['rev-parse', 'HEAD:package-lock.json']).then((r) => r.stdout.trim(), () => '')
     if (lockBefore !== lockAfter) {
