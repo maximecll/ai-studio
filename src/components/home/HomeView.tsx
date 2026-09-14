@@ -14,6 +14,7 @@ import { useImages } from '../../store/images'
 import { ImageControls, ModeToggle, useImageEngine } from '../chat/ImageControls'
 import { useAttachments } from '../../lib/attachments'
 import { PendingStrip } from '../chat/Attachments'
+import { MetalSend } from '../chat/MetalSend'
 import { useUI } from '../../store/ui'
 import { Button, Chip, Menu, MenuItem, MenuLabel, MorphButton, Tooltip } from '../ui/primitives'
 
@@ -234,17 +235,19 @@ export function HomeView() {
                     </Tooltip>
                   </>
                 )}
-                <MorphButton
-                  idle={image ? ImageIcon : Send} hover={Check} variant="primary" size="icon"
-                  iconClassName={image ? undefined : 'translate-x-px -translate-y-px'}
-                  title={
-                    image
-                      ? 'Produire l’image'
-                      : settings.sendOnEnter ? 'Envoyer (Entrée)' : `Envoyer (${modKey}+Entrée)`
-                  }
-                  disabled={(!text.trim() && (image || !jointes.files.length)) || (!image && !model)}
-                  onClick={() => void start(text)}
-                />
+                <MetalSend muted={(!text.trim() && (image || !jointes.files.length)) || (!image && !model)}>
+                  <MorphButton
+                    idle={image ? ImageIcon : Send} hover={Check} variant="primary" size="icon"
+                    iconClassName={image ? undefined : 'translate-x-px -translate-y-px'}
+                    title={
+                      image
+                        ? 'Produire l’image'
+                        : settings.sendOnEnter ? 'Envoyer (Entrée)' : `Envoyer (${modKey}+Entrée)`
+                    }
+                    disabled={(!text.trim() && (image || !jointes.files.length)) || (!image && !model)}
+                    onClick={() => void start(text)}
+                  />
+                </MetalSend>
               </div>
             </div>
           </div>

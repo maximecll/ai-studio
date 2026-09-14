@@ -11,6 +11,7 @@ import { useChat } from '../../store/chat'
 import { Button, Chip, Menu, MenuItem, MenuLabel, MenuSeparator, MorphButton, Tooltip } from '../ui/primitives'
 import { useAttachments } from '../../lib/attachments'
 import { PendingStrip } from './Attachments'
+import { MetalSend } from './MetalSend'
 import { href, navigate } from '../../lib/router'
 import { ImageControls, ModeToggle, useImageEngine } from './ImageControls'
 
@@ -344,16 +345,18 @@ export function Composer({
                 <Square className="size-3 fill-current" />
               </Button>
             ) : (
-              <MorphButton
-                idle={image ? ImageIcon : Send} hover={Check} variant="primary" size="icon"
-                iconClassName={image ? undefined : 'translate-x-px -translate-y-px'}
-                title={
-                  image
-                    ? 'Produire l’image'
-                    : settings.sendOnEnter ? 'Envoyer (Entrée)' : `Envoyer (${modKey}+Entrée)`
-                }
-                disabled={!text.trim() && (image || !jointes.files.length)} onClick={submit}
-              />
+              <MetalSend muted={!text.trim() && (image || !jointes.files.length)}>
+                <MorphButton
+                  idle={image ? ImageIcon : Send} hover={Check} variant="primary" size="icon"
+                  iconClassName={image ? undefined : 'translate-x-px -translate-y-px'}
+                  title={
+                    image
+                      ? 'Produire l’image'
+                      : settings.sendOnEnter ? 'Envoyer (Entrée)' : `Envoyer (${modKey}+Entrée)`
+                  }
+                  disabled={!text.trim() && (image || !jointes.files.length)} onClick={submit}
+                />
+              </MetalSend>
             )
           }
           status={
