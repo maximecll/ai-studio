@@ -12,6 +12,10 @@ rem ====================================================================
 
 cd /d "%~dp0"
 
+rem  Page de codes UTF-8 : sans elle, les accents des messages du serveur
+rem  s'affichent en caracteres illisibles dans cette fenetre.
+chcp 65001 >nul
+
 set "NODE_VERSION=22.12.0"
 set "RUNTIME=%CD%\.runtime"
 if "%PORT%"=="" set "PORT=5300"

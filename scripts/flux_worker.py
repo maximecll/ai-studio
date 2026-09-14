@@ -29,9 +29,15 @@ import time
 from pathlib import Path
 
 # ── Cloisonnement de la sortie ──────────────────────────────────────
-_CHANNEL = os.fdopen(os.dup(1), "w", buffering=1)
+# `encoding` explicite : os.fdopen suit sinon l'encodage local, qui vaut
+# cp1252 sous Windows. PYTHONIOENCODING ne couvre que sys.stdout, pas un
+# flux ouvert après coup — les accents en ressortaient illisibles.
+_CHANNEL = os.fdopen(os.dup(1), "w", buffering=1, encoding="utf-8", errors="replace")
 os.dup2(2, 1)
 sys.stdout = sys.stderr
+for _flux in (sys.stdout, sys.stderr):
+    with contextlib.suppress(Exception):
+        _flux.reconfigure(encoding="utf-8", errors="replace")
 
 _lock = threading.Lock()
 

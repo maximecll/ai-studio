@@ -6,7 +6,7 @@ import { arch, homedir, platform, totalmem } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
-import { download } from './setup.mjs'
+import { download, PS_UTF8 } from './setup.mjs'
 import { attach, isRunning, start } from './tasks.mjs'
 import { promisify } from 'node:util'
 
@@ -532,15 +532,20 @@ export function engineInstalled() {
 }
 
 /** Lance le worker et transforme ses lignes NDJSON en appels à `onEvent`. */
+/** Sous Windows, les outils suivent la page de codes héritée s'ils ne sont pas
+    forcés : les accents ressortent alors illisibles. */
+const ENV_UTF8 = {
+  ...process.env,
+  PYTHONUNBUFFERED: '1',
+  PYTHONIOENCODING: 'utf-8',
+  // Mode UTF-8 complet : couvre aussi les chemins de fichiers accentués.
+  PYTHONUTF8: '1',
+}
+
 function runWorker(command, job, onEvent) {
   const child = spawn(PYTHON, [WORKER, command], {
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: {
-      ...process.env,
-      // Le worker parle JSON : toute sortie parasite doit rester lisible.
-      PYTHONUNBUFFERED: '1',
-      PYTHONIOENCODING: 'utf-8',
-    },
+    env: ENV_UTF8,
   })
 
   child.stdin.end(JSON.stringify(job))
@@ -682,7 +687,7 @@ async function expliquerPip(tail) {
   if (platform() !== 'win32' || !VERROUILLE.test(tail)) return brut
   try {
     const { stdout } = await execute('powershell', ['-NoProfile', '-Command',
-      '(Get-MpPreference).EnableControlledFolderAccess'], { timeout: 15000 })
+      `${PS_UTF8}(Get-MpPreference).EnableControlledFolderAccess`], { timeout: 15000 })
     if (stdout.trim() === '1') {
       return `${brut}\n\nL'accès contrôlé aux dossiers de Windows est actif : il bloque l'écriture dans Documents, Images et Bureau. Autorisez AI Studio dans Sécurité Windows, ou déplacez le dossier du projet hors de Documents.`
     }
@@ -700,7 +705,7 @@ function pipInstall(send) {
     const run = (cmd, args, label) =>
       new Promise((next) => {
         step(label)
-        const child = spawn(cmd, args, { cwd: ROOT })
+        const child = spawn(cmd, args, { cwd: ROOT, env: ENV_UTF8 })
         let tail = ''
         const watch = (s) => {
           s.setEncoding('utf8')
