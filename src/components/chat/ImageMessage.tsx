@@ -6,7 +6,7 @@ import { useImageURL } from '../../lib/hooks'
 import { cn, formatBytes, formatMs, shortTime } from '../../lib/utils'
 import { jobCaption, type Job } from '../../store/images'
 import { Button, MorphButton, ShakeButton, SpinButton, Tooltip } from '../ui/primitives'
-import { ShaderReveal } from './ShaderReveal'
+import { MosaicReveal } from './MosaicReveal'
 
 const ENTER = {
   initial: { opacity: 0, y: 8 },
@@ -58,7 +58,7 @@ export function GeneratingImage({ job, onCancel, onRevealed }: { job: Job; onCan
     <motion.div {...ENTER} className="group/msg max-w-[94%]">
       <Header name={job.modelName} at={job.startedAt} />
       <div style={{ maxWidth: frameWidth(aspect) }}>
-        <ShaderReveal
+        <MosaicReveal
           src={job.src ?? null}
           alt={job.prompt}
           aspect={aspect}
