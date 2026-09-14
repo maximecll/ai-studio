@@ -7,6 +7,10 @@ export interface Commit {
 
 export interface UpdateStatus {
   repo: boolean
+  /** git installé sur la machine : sans lui, aucune mise à jour possible. */
+  git?: boolean
+  gitVersion?: string | null
+  gitInstall?: string
   upstream?: string | null
   head?: string
   behind: number

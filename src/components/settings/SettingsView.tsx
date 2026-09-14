@@ -9,6 +9,7 @@ import { href, navigate } from '../../lib/router'
 import { useModels } from '../../store/models'
 import { toast } from '../../store/ui'
 import { Page } from '../layout/Page'
+import { UpdateSettings } from './UpdateSettings'
 import { Button, ConfirmModal, Dropdown, Field, Input, Switch, Textarea } from '../ui/primitives'
 
 const TRANSCRIPTS: Array<{ value: Transcript; label: string }> = [
@@ -168,6 +169,10 @@ export function SettingsView() {
               </p>
             )}
           </Field>
+        </Group>
+
+        <Group title="Mises à jour">
+          <UpdateSettings />
         </Group>
 
         <Group title="Données">

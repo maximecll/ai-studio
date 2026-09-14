@@ -21,6 +21,28 @@ const git = (args, timeout = 30000) =>
 
 const supervised = () => process.env.AI_STUDIO_SUPERVISED === '1'
 
+const TELECHARGEMENT = {
+  darwin: 'https://git-scm.com/download/mac',
+  win32: 'https://git-scm.com/download/win',
+  linux: 'https://git-scm.com/download/linux',
+}
+
+let present = null
+
+/** git n'est livré ni avec Windows ni avec toutes les distributions : sans
+    lui, aucune mise à jour n'est possible. Le résultat positif est gardé ;
+    l'absence est resondée, l'utilisateur pouvant l'installer entre-temps. */
+async function gitVersion() {
+  if (present) return present
+  try {
+    const { stdout } = await run('git', ['--version'], { timeout: 8000 })
+    present = { ok: true, version: stdout.trim().replace(/^git version /, '') }
+  } catch {
+    return { ok: false, version: null }
+  }
+  return present
+}
+
 /* ── État ─────────────────────────────────────────────────────────── */
 
 let cache = { at: 0, body: null }
@@ -34,17 +56,28 @@ async function upstreamOf() {
 }
 
 async function status() {
+  const outil = await gitVersion()
+  const socle = {
+    git: outil.ok,
+    gitVersion: outil.version,
+    gitInstall: TELECHARGEMENT[platform()] ?? 'https://git-scm.com/downloads',
+    behind: 0,
+  }
+
+  if (!outil.ok) {
+    return { ...socle, repo: false, reason: "git n'est pas installé sur cette machine : sans lui, aucune mise à jour ne peut être récupérée." }
+  }
   if (!existsSync(join(ROOT, '.git'))) {
-    return { repo: false, behind: 0, reason: 'Dossier téléchargé en ZIP : les mises à jour passent par un clone git.' }
+    return { ...socle, repo: false, reason: 'Dossier téléchargé en ZIP : les mises à jour passent par un clone git.' }
   }
   try {
     await git(['rev-parse', '--is-inside-work-tree'], 8000)
   } catch {
-    return { repo: false, behind: 0, reason: 'git est introuvable. Installez-le pour recevoir les mises à jour.' }
+    return { ...socle, repo: false, reason: "Ce dossier n'est pas un dépôt git." }
   }
 
   const upstream = await upstreamOf()
-  if (!upstream) return { repo: true, upstream: null, behind: 0, reason: 'Branche locale sans dépôt distant.' }
+  if (!upstream) return { ...socle, repo: true, upstream: null, reason: 'Branche locale sans dépôt distant.' }
 
   // Un dépôt injoignable ne doit pas bloquer la réponse : on garde l'état connu.
   try { await git(['fetch', '--quiet', '--no-tags'], 25000) } catch { /* hors ligne */ }
@@ -59,6 +92,7 @@ async function status() {
   ])
 
   return {
+    ...socle,
     repo: true,
     upstream,
     head: head.stdout.trim(),

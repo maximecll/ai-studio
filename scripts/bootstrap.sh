@@ -111,7 +111,15 @@ if [ "$needs_build" = 1 ]; then
   npm run build || die "La construction a échoué. Faites défiler pour voir la cause."
 fi
 
-# ── 4 ── Serveur ──────────────────────────────────────────────────────
+# ── 4 ── Git ──────────────────────────────────────────────────────────
+# Non bloquant : l'application tourne sans git, mais ne peut plus se mettre à
+# jour. Mieux vaut le dire au démarrage qu'après des mois de retard.
+if ! command -v git >/dev/null 2>&1; then
+  note "git est introuvable — les mises à jour seront indisponibles."
+  note "Installez-le depuis https://git-scm.com/downloads, puis relancez."
+fi
+
+# ── 5 ── Serveur ──────────────────────────────────────────────────────
 listening() { curl -fsS --max-time 2 "$URL" >/dev/null 2>&1; }
 
 if listening; then
@@ -137,7 +145,7 @@ else
   listening || die "Le serveur n'a pas démarré."
 fi
 
-# ── 5 ── Navigateur ───────────────────────────────────────────────────
+# ── 6 ── Navigateur ───────────────────────────────────────────────────
 step "Ouverture de $URL"
 case "$(platform)" in
   darwin) open "$URL" >/dev/null 2>&1 ;;

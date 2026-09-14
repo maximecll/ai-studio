@@ -80,7 +80,17 @@ if not exist "dist\index.html" (
   if errorlevel 1 goto :echec_build
 )
 
-rem ---- 4 ---- Serveur --------------------------------------------------
+rem ---- 4 ---- Git -----------------------------------------------------
+rem  Non bloquant : l'application tourne sans git, mais ne peut plus se
+rem  mettre a jour. Windows ne le fournit pas d'origine.
+git --version >nul 2>&1
+if errorlevel 1 (
+  echo.
+  echo   git est introuvable - les mises a jour seront indisponibles.
+  echo   Installez-le depuis https://git-scm.com/download/win, puis relancez.
+)
+
+rem ---- 5 ---- Serveur --------------------------------------------------
 rem  On retient le PID : a la fermeture, on n'arrete que ce serveur-la et
 rem  non tous les node.exe de la machine.
 echo.
@@ -101,7 +111,7 @@ for /l %%i in (1,1,60) do (
 )
 if not defined PRET goto :echec_serveur
 
-rem ---- 5 ---- Navigateur -----------------------------------------------
+rem ---- 6 ---- Navigateur -----------------------------------------------
 echo   Ouverture de %URL%
 start "" "%URL%"
 
