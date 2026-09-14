@@ -22,8 +22,6 @@ interface UIState {
   sidebarOpen: boolean
   inspectorOpen: boolean
   paletteOpen: boolean
-  settingsOpen: boolean
-  presetsOpen: boolean
   shortcutsOpen: boolean
   memoryOpen: boolean
   vaultOpen: boolean
@@ -32,8 +30,6 @@ interface UIState {
   toggleSidebar: () => void
   toggleInspector: () => void
   setPalette: (b: boolean) => void
-  setSettingsOpen: (b: boolean) => void
-  setPresetsOpen: (b: boolean) => void
   setShortcutsOpen: (b: boolean) => void
   setMemoryOpen: (b: boolean) => void
   setVaultOpen: (b: boolean) => void
@@ -45,8 +41,6 @@ export const useUI = create<UIState>((set, get) => ({
   sidebarOpen: LS.get('studio.sidebar', true),
   inspectorOpen: LS.get('studio.inspector', false),
   paletteOpen: false,
-  settingsOpen: false,
-  presetsOpen: false,
   shortcutsOpen: false,
   memoryOpen: false,
   vaultOpen: false,
@@ -63,8 +57,6 @@ export const useUI = create<UIState>((set, get) => ({
     set({ inspectorOpen: v })
   },
   setPalette: (paletteOpen) => set({ paletteOpen }),
-  setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
-  setPresetsOpen: (presetsOpen) => set({ presetsOpen }),
   setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
   setMemoryOpen: (memoryOpen) => set({ memoryOpen }),
   setVaultOpen: (vaultOpen) => set({ vaultOpen }),

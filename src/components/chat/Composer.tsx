@@ -8,7 +8,6 @@ import { prettyModel } from '../../lib/ollama'
 import { PresetGlyph } from '../../lib/preset-icons'
 import { useModels } from '../../store/models'
 import { useChat } from '../../store/chat'
-import { useUI } from '../../store/ui'
 import { Button, Chip, Menu, MenuItem, MenuLabel, MenuSeparator, MorphButton, Tooltip } from '../ui/primitives'
 import { href, navigate } from '../../lib/router'
 import { ImageControls, ModeToggle, useImageEngine } from './ImageControls'
@@ -63,7 +62,6 @@ function ModelChip({ conv }: { conv: Conversation }) {
 /** Sélecteur de preset — même capsule, même hauteur, même graisse. */
 function PresetChip({ conv }: { conv: Conversation }) {
   const presets = usePresets()
-  const setPresetsOpen = useUI((s) => s.setPresetsOpen)
   const current = presets.find((p) => p.id === conv.presetId)
 
   return (
@@ -104,18 +102,12 @@ function PresetChip({ conv }: { conv: Conversation }) {
         </MenuItem>
       ))}
       <MenuSeparator />
-      <MenuItem onClick={() => setPresetsOpen(true)}>Gérer les presets…</MenuItem>
+      <MenuItem onClick={() => navigate(href.presets())}>Gérer les presets…</MenuItem>
     </Menu>
   )
 }
 
-/**
- * Bascule texte / image.
- *
- * Le choix reste collé à la conversation : on décrit rarement une image puis
- * on repose une question dans la foulée, et retrouver le mode où on l'avait
- * laissé évite de se tromper d'envoi.
- */
+/** Bascule texte / image. */
 export function useComposerMode(conversationId: string) {
   const [mode, setMode] = useState<'text' | 'image'>('text')
   useEffect(() => {

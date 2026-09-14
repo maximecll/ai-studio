@@ -7,10 +7,7 @@ import { AnimatePresence, motion, type HTMLMotionProps } from 'framer-motion'
 import { Check, ChevronDown, X, type LucideIcon } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
-/* ═══════════════════════════════════════════════════════════════════
-   Boutons — capsule systématique, 13px medium, réaction au survol
-   et à l'appui. Trois variantes seulement.
-   ═══════════════════════════════════════════════════════════════════ */
+// ═══════════════════════════════════════════════════════════════════ Boutons — capsule systématique, 13px medium, réaction au survol et à l'appui.
 
 type Variant = 'primary' | 'soft' | 'quiet' | 'danger'
 type Size = 'sm' | 'md' | 'lg' | 'icon-sm' | 'icon' | 'icon-lg'
@@ -58,10 +55,7 @@ export function Button({ variant = 'quiet', size = 'md', active, className, ...p
   )
 }
 
-/**
- * Icône qui se métamorphose au survol (Copier → Coché, Télécharger → Coché).
- * Ressort rapide, échelle 0.5 → 1 : le geste se sent, sans distraire.
- */
+/** Icône qui se métamorphose au survol (Copier → Coché, Télécharger → Coché). */
 function MorphIcon({ idle: Idle, hover: Hover, hovered, className }: {
   idle: LucideIcon
   hover: LucideIcon
@@ -231,9 +225,7 @@ export function Chip({
   )
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   Surfaces
-   ═══════════════════════════════════════════════════════════════════ */
+// ═══════════════════════════════════════════════════════════════════ Surfaces ═══════════════════════════════════════════════════════════════════
 
 export function Card({ children, className, float }: { children: ReactNode; className?: string; float?: boolean }) {
   return (
@@ -243,12 +235,7 @@ export function Card({ children, className, float }: { children: ReactNode; clas
   )
 }
 
-/**
- * Badge — deux variantes seulement :
- * · outline : fond transparent, contour d'un pixel
- * · soft    : fond teinté, aucun contour
- * Géométrie fixe h-6 / px-3 / py-1, rayon du palier « lignes ».
- */
+/** Badge — deux variantes seulement : · outline : fond transparent, contour d'un pixel · soft : fond teinté, aucun contour Géométrie fixe h-6 / px-3 /… */
 type BadgeTone = 'neutral' | 'positive' | 'caution' | 'negative'
 
 const BADGE_SOFT: Record<BadgeTone, string> = {
@@ -287,9 +274,7 @@ export function Badge({
   )
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   Info-bulle
-   ═══════════════════════════════════════════════════════════════════ */
+// ═══════════════════════════════════════════════════════════════════ Info-bulle ═══════════════════════════════════════════════════════════════════
 
 export function Tooltip({
   label, children, side = 'bottom', kbd,
@@ -327,9 +312,7 @@ export function Kbd({ children }: { children: ReactNode }) {
   )
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   Modale
-   ═══════════════════════════════════════════════════════════════════ */
+// ═══════════════════════════════════════════════════════════════════ Modale ═══════════════════════════════════════════════════════════════════
 
 export function Modal({
   open, onClose, title, description, children, footer, width = 'max-w-lg', icon,
@@ -420,9 +403,7 @@ export function ConfirmModal({
   )
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   Menu
-   ═══════════════════════════════════════════════════════════════════ */
+// ═══════════════════════════════════════════════════════════════════ Menu ═══════════════════════════════════════════════════════════════════
 
 const MenuCtx = createContext<{ close: () => void }>({ close: () => {} })
 
@@ -513,9 +494,7 @@ export function MenuLabel({ children }: { children: ReactNode }) {
   return <div className="t-label px-2.5 pt-2 pb-1.5 text-fg-subtle">{children}</div>
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   Formulaires
-   ═══════════════════════════════════════════════════════════════════ */
+// ═══════════════════════════════════════════════════════════════════ Formulaires ═══════════════════════════════════════════════════════════════════
 
 export function Field({
   label, hint, children, htmlFor, action,
@@ -545,10 +524,7 @@ export function Textarea({ className, ...props }: React.TextareaHTMLAttributes<H
   return <textarea {...props} className={cn(CONTROL, 'resize-none px-3 py-2.5 leading-relaxed scroll-thin', className)} />
 }
 
-/**
- * Liste déroulante maison — rien de natif : même rayon, même graisse,
- * mêmes teintes que le reste, et le panneau suit la largeur du champ.
- */
+/** Liste déroulante maison — rien de natif : même rayon, même graisse, mêmes teintes que le reste, et le panneau suit la largeur du champ. */
 export function Dropdown<T extends string>({
   value, onChange, options, placeholder = 'Choisir…', className,
 }: {

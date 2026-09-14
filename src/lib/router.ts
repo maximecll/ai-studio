@@ -4,6 +4,8 @@ export type Route =
   | { name: 'home' }
   | { name: 'conversation'; id: string }
   | { name: 'models' }
+  | { name: 'settings' }
+  | { name: 'presets' }
   | { name: 'notfound'; path: string }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -12,6 +14,8 @@ export function parse(pathname: string): Route {
   const path = pathname.replace(/\/+$/, '') || '/'
   if (path === '/') return { name: 'home' }
   if (path === '/models') return { name: 'models' }
+  if (path === '/settings') return { name: 'settings' }
+  if (path === '/presets') return { name: 'presets' }
 
   const conv = /^\/c\/([^/]+)$/.exec(path)
   // Un identifiant mal formé est un 404 immédiat : inutile d'interroger la base.
@@ -25,6 +29,8 @@ export const href = {
   home: () => '/',
   conversation: (id: string) => `/c/${id}`,
   models: () => '/models',
+  settings: () => '/settings',
+  presets: () => '/presets',
 }
 
 type Listener = (r: Route) => void

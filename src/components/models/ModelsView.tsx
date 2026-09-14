@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import {
-  ArrowLeft, Boxes, Brain, Cpu, Eye, HardDrive, MessageSquare,
+  Boxes, Brain, Cpu, Eye, HardDrive, MessageSquare,
   MessageSquarePlus, PowerOff, RefreshCw, Trash2, Wrench,
 } from 'lucide-react'
 import { createConversation } from '../../lib/db'
@@ -17,6 +17,7 @@ import { ImageEngine, LoraLibrary } from './ImageEngine'
 import { toast } from '../../store/ui'
 import { Badge, Button, ConfirmModal, Tooltip } from '../ui/primitives'
 import { href, navigate } from '../../lib/router'
+import { Page } from '../layout/Page'
 
 const CAPABILITIES: Record<string, { label: string; icon: React.ReactNode }> = {
   completion: { label: 'Texte', icon: <MessageSquare className="size-3" /> },
@@ -186,15 +187,17 @@ export function ModelsView() {
   const onCpu = running.filter((m) => (m.size ?? 0) > 0 && !(m.size_vram ?? 0))
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-bg">
-      <header className="flex h-16 shrink-0 items-center gap-3 border-b border-line bg-nav px-4">
-        <Button size="icon-sm" onClick={() => navigate(href.home())} aria-label="Retour"><ArrowLeft size={16} /></Button>
-        <h1 className="text-[15px] font-bold tracking-[-0.02em]">Modèles</h1>
-        <span className="text-[13px] text-fg-subtle">
+    <Page
+      title="Modèles"
+      subtitle={
+        <>
           {models.length} installé{models.length > 1 ? 's' : ''} · {formatBytes(totalSize)}
           {vram > 0 && ` · ${formatBytes(vram)} en mémoire`}
-        </span>
-        <div className="ml-auto flex items-center gap-3">
+        </>
+      }
+      width="max-w-6xl"
+      actions={
+        <>
           {version && <span className="font-mono text-[12px] text-fg-subtle">Ollama v{version}</span>}
           <Tooltip label="Rafraîchir">
             <Button
@@ -204,11 +207,10 @@ export function ModelsView() {
               <RefreshCw size={16} className={cn(spinning && 'animate-spin')} />
             </Button>
           </Tooltip>
-        </div>
-      </header>
-
-      <div className="min-h-0 flex-1 overflow-y-auto scroll-thin">
-        <div className="mx-auto w-full max-w-5xl space-y-6 px-6 py-8">
+        </>
+      }
+    >
+      <div className="space-y-8">
           {/* Un modèle chargé hors du GPU divise le débit par cinq, sans aucun
               message. Ollama ne sonde le GPU qu'au démarrage du démon : si la
               mémoire était saturée à ce moment-là, il reste sur le processeur
@@ -251,7 +253,7 @@ export function ModelsView() {
           <Downloads />
 
           {models.length > 0 && (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
               {models.map((m) => (
                 <ModelCard key={m.name} model={m} loaded={running.find((r) => r.name === m.name)} />
               ))}
@@ -264,15 +266,14 @@ export function ModelsView() {
 
           <Maintenance />
 
-          {models.length === 0 && status === 'online' && (
-            <div className="rounded-lg border border-dashed border-line py-20 text-center">
-              <Boxes size={20} className="mx-auto text-fg-subtle" />
-              <p className="mt-4 text-[15px] font-medium">Aucun modèle installé</p>
-              <p className="mt-1 text-[14px] text-fg-subtle">Téléchargez-en un ci-dessus pour commencer.</p>
-            </div>
-          )}
-        </div>
+        {models.length === 0 && status === 'online' && (
+          <div className="rounded-lg border border-dashed border-line py-24 text-center">
+            <Boxes size={20} className="mx-auto text-fg-subtle" />
+            <p className="mt-4 text-[15px] font-medium">Aucun modèle installé</p>
+            <p className="mt-1 text-[14px] text-fg-subtle">Cherchez-en un ci-dessus par son nom.</p>
+          </div>
+        )}
       </div>
-    </div>
+    </Page>
   )
 }

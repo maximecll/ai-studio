@@ -57,10 +57,7 @@ export interface LoraFile {
   file: string
   name: string
   bytes: number
-  /**
-   * Architecture déclarée dans les métadonnées. Indicative seulement : les
-   * outils d'entraînement y écrivent régulièrement n'importe quoi.
-   */
+  /** Architecture déclarée dans les métadonnées. */
   architecture?: string
   /** Famille déduite des noms de tenseurs — fiable, c'est là-dessus qu'on tranche. */
   target?: string
@@ -70,17 +67,11 @@ export interface LoraFile {
   rank?: number
   /** Mot déclencheur à placer dans la description, quand l'auteur en a prévu un. */
   trigger?: string
-  /**
-   * Expert visé sur un modèle à double transformeur : « high » pour le bruit
-   * élevé, « low » pour le bruit faible. Les LoRAs Wan A14B vont par paires.
-   */
+  /** Expert visé sur un modèle à double transformeur : « high » pour le bruit élevé, « low » pour le bruit faible. */
   expert?: 'high' | 'low'
 }
 
-/**
- * Réglages de diffusion. Sans rapport avec `Params`, qui pilote un modèle de
- * langage : la génération d'images n'a ni température ni contexte.
- */
+/** Réglages de diffusion. */
 export interface ImageParams {
   /** Identifiant du catalogue servi par `/images/status`. */
   model: string
@@ -123,12 +114,7 @@ export interface Message {
   content: string
   /** Image produite par diffusion — le message porte alors l'image, pas du texte. */
   image?: ImageMeta
-  /**
-   * Réglages avec lesquels ce message a été envoyé au moteur de diffusion.
-   * Présent sur le message de l'utilisateur, et seulement en mode image : il
-   * permet de relancer la génération à l'identique si elle a été interrompue —
-   * un rechargement de page pendant sept minutes d'attente, par exemple.
-   */
+  /** Réglages avec lesquels ce message a été envoyé au moteur de diffusion. */
   imageRequest?: ImageParams
   /** Raisonnement séparé, pour les modèles « thinking ». */
   thinking?: string
@@ -140,12 +126,7 @@ export interface Message {
   folded?: 0 | 1
 }
 
-/**
- * Octets d'une image, rangés à part des messages.
- *
- * Séparer la pièce lourde de sa fiche garde les listes de messages légères :
- * Dexie ne charge les mégaoctets que lorsqu'une image est réellement affichée.
- */
+/** Octets d'une image, rangés à part des messages. */
 export interface ImageBlob {
   id: string
   conversationId: string
@@ -177,11 +158,7 @@ export interface Conversation {
   transcript: Transcript
   /** Contenus chiffrés au repos, illisibles coffre fermé. */
   locked: 0 | 1
-  /**
-   * Réglages de diffusion propres à cette conversation — modèle, format, LoRAs.
-   * Absent sur les conversations créées avant leur existence : on retombe alors
-   * sur les valeurs par défaut.
-   */
+  /** Réglages de diffusion propres à cette conversation — modèle, format, LoRAs. */
   imageParams?: ImageParams
   /** Mémo Markdown alimenté au fil de la conversation. */
   memory: string
@@ -212,13 +189,14 @@ export interface Folder {
 }
 
 export type Theme = 'light' | 'dark' | 'system'
-export type UIFont = 'dm' | 'satoshi' | 'inter'
 
 export interface Settings {
   id: 'app'
   theme: Theme
-  /** Fonte de l'interface : Satoshi (défaut) ou Inter. */
-  fontFamily: UIFont
+  /** Nom d'affichage, utilisé dans la salutation de l'accueil. */
+  displayName: string
+  /** Le didacticiel de premier lancement a été vu ou ignoré. */
+  onboarded: boolean
   defaultModel: string
   defaultSystem: string
   defaultParams: Params

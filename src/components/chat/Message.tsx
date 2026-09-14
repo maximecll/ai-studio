@@ -276,9 +276,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   disabled?: boolean
   transcript?: Transcript
 }) {
-  /* Normale : raisonnement replié. Réflexion : raisonnement ouvert, réponse
-     repliée. Détaillée : tout est ouvert. Les mesures, elles, restent toujours
-     au survol — comme les icônes, et en même temps qu'elles. */
+  // Normale : raisonnement replié.
   const focusThinking = transcript === 'thinking' && !!message.thinking
   /* Réponse arrêtée par la limite de jetons : à signaler franchement, pas
      seulement dans les mesures au survol. */

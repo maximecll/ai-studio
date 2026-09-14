@@ -1,27 +1,22 @@
-import { useEffect, useState } from 'react'
-import { Plus, Sparkles, Trash2, Wand2 } from 'lucide-react'
+import { useState } from 'react'
+import { Plus, Trash2, Wand2 } from 'lucide-react'
 import { db, updateConversation } from '../../lib/db'
 import { usePresets } from '../../lib/hooks'
 import type { Preset } from '../../lib/types'
 import { cn, uid } from '../../lib/utils'
 import { PresetGlyph } from '../../lib/preset-icons'
-import { IconPicker } from './SavePresetModal'
-import { toast, useUI } from '../../store/ui'
-import { Button, Field, Input, Modal, Slider, Textarea } from '../ui/primitives'
 import { useRoute } from '../../lib/router'
+import { toast } from '../../store/ui'
+import { IconPicker } from './SavePresetModal'
+import { Page } from '../layout/Page'
+import { Button, Field, Input, Slider, Textarea } from '../ui/primitives'
 
-
-export function PresetsModal() {
-  const { presetsOpen, setPresetsOpen } = useUI()
+export function PresetsView() {
   const route = useRoute()
   const activeId = route.name === 'conversation' ? route.id : null
   const presets = usePresets()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const selected = presets.find((p) => p.id === selectedId) ?? presets[0]
-
-  useEffect(() => {
-    if (presetsOpen && !selectedId && presets.length) setSelectedId(presets[0].id)
-  }, [presetsOpen, selectedId, presets])
 
   const patch = (p: Preset, changes: Partial<Preset>) => void db.presets.update(p.id, changes)
 
@@ -35,41 +30,13 @@ export function PresetsModal() {
   }
 
   return (
-    <Modal
-      open={presetsOpen}
-      onClose={() => setPresetsOpen(false)}
+    <Page
       title="Presets"
-      description="Des combinaisons d'instructions et de paramètres, applicables en un clic."
-      width="max-w-3xl"
-      icon={<Sparkles size={16} />}
-      footer={
-        <>
-          <Button variant="soft" size="sm" onClick={create}><Plus size={16} /> Nouveau preset</Button>
-          <div className="flex-1" />
-          {selected && activeId && (
-            <Button
-              variant="primary" size="sm"
-              onClick={async () => {
-                const conv = await db.conversations.get(activeId)
-                if (!conv) return
-                await updateConversation(activeId, {
-                  presetId: selected.id,
-                  system: selected.system,
-                  params: { ...conv.params, ...selected.params },
-                  ...(selected.model ? { model: selected.model } : {}),
-                })
-                toast({ title: 'Preset appliqué', description: selected.name, tone: 'success' })
-                setPresetsOpen(false)
-              }}
-            >
-              <Wand2 size={16} /> Appliquer à la conversation
-            </Button>
-          )}
-        </>
-      }
+      subtitle="Instructions et paramètres, applicables en un clic."
+      actions={<Button variant="soft" size="sm" onClick={create}><Plus size={16} /> Nouveau</Button>}
     >
-      <div className="flex min-h-[420px] gap-6">
-        <nav className="w-52 shrink-0 space-y-0.5 border-r border-line pr-4">
+      <div className="grid gap-6 md:grid-cols-[14rem_1fr]">
+        <nav className="space-y-0.5">
           {presets.map((p) => (
             <button
               key={p.id}
@@ -87,33 +54,34 @@ export function PresetsModal() {
         </nav>
 
         {selected ? (
-          <div className="min-w-0 flex-1 space-y-5">
-            <Field label="Nom">
-              <Input value={selected.name} onChange={(e) => patch(selected, { name: e.target.value })} />
-            </Field>
+          <div className="min-w-0 space-y-6 rounded-lg bg-surface p-6 shadow-card">
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field label="Nom">
+                <Input value={selected.name} onChange={(e) => patch(selected, { name: e.target.value })} />
+              </Field>
+              <Field label="Description">
+                <Input
+                  value={selected.description}
+                  onChange={(e) => patch(selected, { description: e.target.value })}
+                  placeholder="À quoi sert ce preset ?"
+                />
+              </Field>
+            </div>
 
             <Field label="Icône">
               <IconPicker value={selected.icon} onChange={(icon) => patch(selected, { icon })} />
             </Field>
 
-            <Field label="Description">
-              <Input
-                value={selected.description}
-                onChange={(e) => patch(selected, { description: e.target.value })}
-                placeholder="À quoi sert ce preset ?"
-              />
-            </Field>
-
             <Field label="Instructions système" hint="Ce que le modèle doit savoir avant de répondre.">
               <Textarea
-                rows={6}
+                rows={8}
                 value={selected.system}
                 onChange={(e) => patch(selected, { system: e.target.value })}
                 placeholder="Tu es…"
               />
             </Field>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-5 sm:grid-cols-2">
               <Slider
                 label="Température" value={selected.params.temperature} defaultValue={0.8} min={0} max={2} step={0.05}
                 onChange={(v) => patch(selected, { params: { ...selected.params, temperature: v } })}
@@ -126,7 +94,7 @@ export function PresetsModal() {
               />
             </div>
 
-            <div className="flex justify-end border-t border-line pt-4">
+            <div className="flex items-center gap-3 border-t border-line pt-5">
               <Button
                 variant="quiet" size="sm" className="text-danger"
                 onClick={async () => {
@@ -134,16 +102,35 @@ export function PresetsModal() {
                   setSelectedId(null)
                 }}
               >
-                <Trash2 size={16} /> Supprimer ce preset
+                <Trash2 size={16} /> Supprimer
               </Button>
+              <div className="flex-1" />
+              {activeId && (
+                <Button
+                  variant="primary" size="sm"
+                  onClick={async () => {
+                    const conv = await db.conversations.get(activeId)
+                    if (!conv) return
+                    await updateConversation(activeId, {
+                      presetId: selected.id,
+                      system: selected.system,
+                      params: { ...conv.params, ...selected.params },
+                      ...(selected.model ? { model: selected.model } : {}),
+                    })
+                    toast({ title: 'Preset appliqué', description: selected.name, tone: 'success' })
+                  }}
+                >
+                  <Wand2 size={16} /> Appliquer à la conversation
+                </Button>
+              )}
             </div>
           </div>
         ) : (
-          <div className="flex flex-1 items-center justify-center">
+          <div className="flex items-center justify-center rounded-lg border border-dashed border-line py-20">
             <Button variant="soft" size="sm" onClick={create}><Plus size={16} /> Créer un preset</Button>
           </div>
         )}
       </div>
-    </Modal>
+    </Page>
   )
 }

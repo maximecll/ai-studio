@@ -54,8 +54,8 @@ export function CommandPalette() {
         run: () => navigate(href.home()),
       },
       { id: 'models', label: 'Gérer les modèles', icon: <Boxes size={16} />, group: 'Actions', keywords: 'télécharger pull vram', run: () => navigate(href.models()) },
-      { id: 'presets', label: 'Gérer les presets', icon: <Sparkles size={16} />, group: 'Actions', keywords: 'persona instructions', run: () => ui.setPresetsOpen(true) },
-      { id: 'settings', label: 'Ouvrir les réglages', icon: <SettingsIcon size={16} />, group: 'Actions', hint: `${modKey},`, run: () => ui.setSettingsOpen(true) },
+      { id: 'presets', label: 'Gérer les presets', icon: <Sparkles size={16} />, group: 'Actions', keywords: 'persona instructions', run: () => navigate(href.presets()) },
+      { id: 'settings', label: 'Ouvrir les réglages', icon: <SettingsIcon size={16} />, group: 'Actions', hint: `${modKey},`, run: () => navigate(href.settings()) },
       { id: 'sidebar', label: 'Afficher/masquer la barre latérale', icon: <PanelLeft size={16} />, group: 'Affichage', hint: `${modKey}B`, run: ui.toggleSidebar },
       { id: 'inspector', label: 'Afficher/masquer les paramètres', icon: <SlidersHorizontal size={16} />, group: 'Affichage', hint: `${modKey}I`, run: ui.toggleInspector },
       {

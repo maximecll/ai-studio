@@ -1,15 +1,4 @@
-/**
- * Génération d'images.
- *
- * Ollama est un moteur de modèles de langage : il ne sait pas faire de
- * diffusion. FLUX passe donc par mflux — le portage MLX de FLUX, qui tourne
- * nativement sur la puce Apple. Ce module est la charnière : il installe le
- * moteur, télécharge les poids, lance les générations et sert les fichiers.
- *
- * Tout ce qui prend du temps répond en NDJSON, une ligne par événement,
- * comme le fait Ollama pour ses téléchargements : l'interface n'a ainsi
- * qu'un seul motif de progression à savoir afficher.
- */
+/** Génération d'images. */
 import { spawn } from 'node:child_process'
 import { createReadStream, existsSync } from 'node:fs'
 import { mkdir, open, readdir, rm, stat } from 'node:fs/promises'
@@ -28,27 +17,12 @@ const PYTHON = join(VENV, 'bin', 'python')
 /** Les images fraîches attendent ici que l'interface vienne les chercher. */
 const STAGING = join(homedir(), '.studio', 'images')
 
-/**
- * Bibliothèque de LoRAs — un simple dossier où l'on dépose des fichiers.
- *
- * Pas de base, pas d'import : ce que contient le dossier est ce qui est
- * disponible. C'est la forme la plus simple qui survive à tout, y compris à
- * une application qu'on n'a pas ouverte depuis six mois.
- */
+/** Bibliothèque de LoRAs — un simple dossier où l'on dépose des fichiers. */
 const LORAS = process.env.STUDIO_LORAS ?? join(homedir(), '.studio', 'loras')
 /** Au-delà, une image non récupérée est un déchet : l'onglet a été fermé. */
 const STALE_MS = 6 * 60 * 60 * 1000
 
-/* ── Catalogue ────────────────────────────────────────────────────────
- *
- * `repo` est ce qu'on télécharge, `base` l'architecture que mflux doit
- * reconnaître. Les redistributions « mflux-Nbit » portent des poids déjà
- * quantifiés : rien à quantifier au chargement, et trois fois moins à
- * télécharger que le dépôt d'origine.
- *
- * Les dépôts de Black Forest Labs sont sous licence à acceptation préalable
- * (`gated`) : sans jeton Hugging Face ils répondent 401, d'où les miroirs.
- */
+// ── Catalogue ──────────────────────────────────────────────────────── `repo` est ce qu'on télécharge, `base` l'architecture que mflux doit…
 export const CATALOG = [
   {
     id: 'flux-dev-4bit',
@@ -167,13 +141,9 @@ export const CATALOG = [
     /* L'encodeur de texte de 11 Go est le poste le plus lourd ; il est libéré ensuite. */
     needsRam: 11_500_000_000,
     family: 'wan',
-    /* Wan est un modèle vidéo ; réglé sur une seule image, il rend une image
-       fixe. Il ne passe pas par mflux mais par mlx-video, d'où un exécutant
-       distinct — le seul point où les deux moteurs diffèrent. */
+    // Wan est un modèle vidéo ; réglé sur une seule image, il rend une image fixe.
     runner: 'mlx-video',
-    /* Wan A14B porte les mêmes noms de couches que le 5 B : seule la largeur
-       les distingue. Sans ce contrôle, un LoRA A14B planterait le chargement
-       après deux minutes d'encodage du texte. */
+    // Wan A14B porte les mêmes noms de couches que le 5 B : seule la largeur les distingue.
     loraTarget: 'wan',
     loraWidth: 3072,
     name: 'Wan2.2 TI2V',
@@ -199,9 +169,7 @@ export const CATALOG = [
     needsRam: 15_600_000_000,
     family: 'wan',
     runner: 'mlx-video',
-    /* Deux transformeurs experts : bruit élevé pour la composition, bruit
-       faible pour les détails. Les LoRAs viennent donc par paires, et chacun
-       ne vaut que pour l'un des deux. */
+    // Deux transformeurs experts : bruit élevé pour la composition, bruit faible pour les détails.
     dual: true,
     loraTarget: 'wan',
     loraWidth: 5120,
@@ -255,13 +223,7 @@ export const byId = (id) => CATALOG.find((m) => m.id === id)
 /** Au-delà, l'en-tête n'est plus un en-tête : on refuse plutôt que de ramer. */
 const HEADER_CAP = 32 * 1024 * 1024
 
-/**
- * En-tête d'un fichier safetensors : huit octets de longueur, puis du JSON.
- *
- * On n'en garde qu'une poignée de champs. Ces fichiers embarquent parfois des
- * milliers de mots de journal d'entraînement — les recopier dans l'interface
- * n'apprendrait rien à personne et alourdirait chaque réponse.
- */
+/** En-tête d'un fichier safetensors : huit octets de longueur, puis du JSON. */
 async function readHeader(file) {
   const handle = await open(file, 'r')
   try {
@@ -281,13 +243,7 @@ async function readHeader(file) {
   }
 }
 
-/**
- * Architecture réellement visée, déduite des noms de tenseurs.
- *
- * Les métadonnées déclarées mentent souvent — un LoRA Wan 5B croisé ici
- * annonçait « sd_1.5 ». Les noms de clés, eux, viennent de l'architecture
- * elle-même : ils ne peuvent pas se tromper.
- */
+/** Architecture réellement visée, déduite des noms de tenseurs. */
 const KEY_SIGNATURES = [
   [/^diffusion_model\.blocks\.|^blocks\.\d+\.(self_attn|cross_attn|ffn)/, 'wan'],
   /* Convention kohya, très répandue pour les LoRAs Wan entraînés à la main.
@@ -314,11 +270,7 @@ function targetOf(header) {
   return best?.[0]
 }
 
-/**
- * Largeur du modèle visé : la dimension la plus fréquente des matrices de rang
- * faible. C'est elle qui sépare un Wan 5 B (3072) d'un A14B, à noms de couches
- * pourtant identiques.
- */
+/** Largeur du modèle visé : la dimension la plus fréquente des matrices de rang faible. */
 function widthOf(header) {
   const tally = new Map()
   for (const [key, spec] of Object.entries(header)) {
@@ -334,14 +286,7 @@ function widthOf(header) {
   return best?.[0]
 }
 
-/**
- * Expert visé, pour les modèles à double transformeur.
- *
- * Wan2.2 A14B sépare le bruit élevé (composition) du bruit faible (détails) en
- * deux transformeurs distincts. Un LoRA ne vaut que pour l'un des deux, et rien
- * dans ses tenseurs ne le dit — seuls le nom du modèle d'entraînement, le titre
- * ou le nom de fichier le trahissent.
- */
+/** Expert visé, pour les modèles à double transformeur. */
 function expertOf(meta, filename) {
   const haystack = [meta.ss_sd_model_name, meta['modelspec.title'], filename]
     .filter(Boolean).join(' ').toLowerCase()
@@ -450,12 +395,7 @@ async function readBody(req) {
 /** Les bibliothèques colorent leur sortie ; l'interface n'en veut pas. */
 const ANSI = /\u001b\[[0-9;]*[A-Za-z]/g
 
-/**
- * Dernières lignes utiles d'une sortie d'erreur.
- *
- * Découper à l'aveugle sur un nombre d'octets produit un début de phrase
- * amputé et des couleurs en clair. On garde des lignes entières, nettoyées.
- */
+/** Dernières lignes utiles d'une sortie d'erreur. */
 function lastLines(text, count = 3) {
   return String(text)
     .replace(ANSI, '')
@@ -467,14 +407,7 @@ function lastLines(text, count = 3) {
     .slice(0, 400)
 }
 
-/**
- * Ce qu'il faut dire quand un worker s'arrête mal.
- *
- * Un processus tué par signal n'a rien écrit : pas d'exception, pas de trace.
- * Sur cette classe de machine, c'est presque toujours le système qui a repris
- * la mémoire de force — et c'est ça qu'il faut dire, pas les derniers octets
- * d'une barre de progression.
- */
+/** Ce qu'il faut dire quand un worker s'arrête mal. */
 function explainFailure({ code, signal, tail }, entry) {
   if (signal === 'SIGKILL' || signal === 'SIGABRT' || signal === 'SIGBUS') {
     const weight = entry ? ` ${entry.name} ${entry.variant} demande plus de mémoire que la machine n'en a de libre.` : ''
@@ -494,11 +427,7 @@ export function engineInstalled() {
   return existsSync(PYTHON) && existsSync(WORKER)
 }
 
-/**
- * Lance le worker et transforme ses lignes NDJSON en appels à `onEvent`.
- * Rend un objet muni de `kill()` : l'annulation est un SIGTERM, que le
- * worker traite proprement, puis un SIGKILL si le processus s'obstine.
- */
+/** Lance le worker et transforme ses lignes NDJSON en appels à `onEvent`. */
 function runWorker(command, job, onEvent) {
   const child = spawn(PYTHON, [WORKER, command], {
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -529,9 +458,7 @@ function runWorker(command, job, onEvent) {
     }
   })
 
-  /* La sortie d'erreur porte les barres de progression et les avertissements
-     des bibliothèques. On n'en garde que la fin, pour pouvoir expliquer un
-     échec sans inonder la mémoire. */
+  // La sortie d'erreur porte les barres de progression et les avertissements des bibliothèques.
   let tail = ''
   child.stderr.setEncoding('utf8')
   child.stderr.on('data', (c) => { tail = (tail + c).slice(-4000) })
@@ -703,9 +630,7 @@ async function status(res) {
         ...m,
         installed: !!seen?.present,
         onDisk,
-        /* Un transfert repéré sur le disque, qu'il vienne ou non de cette
-           application : l'interface doit pouvoir le montrer après un
-           redémarrage comme après un lancement depuis le terminal. */
+        // Un transfert repéré sur le disque, qu'il vienne ou non de cette application : l'interface doit pouvoir le montrer après un redémarrage comme après un…
         downloading: !!seen?.downloading,
         /* Des morceaux partiels mais plus aucun mouvement : téléchargement
            interrompu, reprenable. */
@@ -755,10 +680,7 @@ async function generate(req, res) {
   const prompt = String(body.prompt ?? '').trim()
   if (!prompt) return json(res, 400, { error: 'Description manquante.' })
 
-  /* Certains modèles ne peuvent pas tenir, quoi qu'on ferme. On le dit en une
-     seconde plutôt que de laisser le système tuer le processus au bout de
-     quatre minutes, sans message exploitable. La marge couvre le système et
-     l'interface ; elle ne dépend pas de l'occupation du moment, qui fluctue. */
+  // Certains modèles ne peuvent pas tenir, quoi qu'on ferme.
   const OS_FLOOR = 2_000_000_000
   if (entry.needsRam && entry.needsRam > totalmem() - OS_FLOOR) {
     return json(res, 409, {
@@ -788,9 +710,7 @@ async function generate(req, res) {
     const full = loraPath(l?.file)
     if (!full) continue
 
-    /* Contrôle avant de lancer quoi que ce soit. Un adaptateur de la mauvaise
-       largeur ne serait rejeté qu'au chargement du transformeur, après deux
-       minutes d'encodage du texte — autant le dire tout de suite. */
+    // Contrôle avant de lancer quoi que ce soit.
     const described = await describeLora(l.file).catch(() => null)
     if (described && entry.loraWidth && described.width && described.width !== entry.loraWidth) {
       return json(res, 400, {
@@ -829,9 +749,7 @@ async function generate(req, res) {
     steps,
     seed,
     loras,
-    /* Fusionner l'adaptateur dans un modèle 4 bits oblige mflux à requantifier
-       en 8 bits les couches touchées, et la mémoire grimpe d'autant. Sur cette
-       classe de machine, l'adaptateur appliqué à l'exécution coûte moins cher. */
+    // Fusionner l'adaptateur dans un modèle 4 bits oblige mflux à requantifier en 8 bits les couches touchées, et la mémoire grimpe d'autant.
     bakeLora: body.bakeLora === true,
     width: round16(body.width, 1024),
     height: round16(body.height, 1024),

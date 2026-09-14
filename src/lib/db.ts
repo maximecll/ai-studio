@@ -64,9 +64,7 @@ class StudioDB extends Dexie {
         }),
       )
 
-    /* v5 : les images produites par diffusion. Les octets vivent dans leur
-       propre table — un message reste une fiche légère, et Dexie ne charge
-       les mégaoctets que lorsqu'une image est réellement affichée. */
+    // v5 : les images produites par diffusion.
     this.version(5).stores({
       conversations: 'id, updatedAt, createdAt, pinned, folderId, archived, locked, *tags',
       messages: 'id, conversationId, createdAt, [conversationId+createdAt]',
@@ -77,18 +75,10 @@ class StudioDB extends Dexie {
       images: 'id, conversationId, createdAt',
     })
 
-    /* v6 : les réglages de diffusion descendent au niveau de la conversation,
-       comme ceux du modèle de langage. Les conversations existantes restent à
-       `undefined` et suivent les valeurs par défaut — aucune migration de
-       données n'est nécessaire, seulement une résolution à la lecture. */
+    // v6 : les réglages de diffusion descendent au niveau de la conversation, comme ceux du modèle de langage.
     this.version(6)
 
-    /* v7 : « Jamais » libérer la mémoire se retourne contre l'utilisateur.
-       Ollama décide au chargement combien de couches partent sur le GPU ; si la
-       mémoire était saturée à cet instant, il n'en met aucune. Un modèle qui ne
-       se décharge jamais fige cette décision pour de bon, et tout tourne cinq
-       fois plus lentement sans le moindre message. Une heure garde le modèle
-       chaud sur toute une session de travail, sans le piège. */
+    // v7 : « Jamais » libérer la mémoire se retourne contre l'utilisateur.
     this.version(7).upgrade((tx) =>
       tx.table('settings').toCollection().modify((s: Record<string, unknown>) => {
         if (s.keepAlive === '-1') s.keepAlive = '1h'
@@ -118,7 +108,8 @@ export const DEFAULT_IMAGE_PARAMS: ImageParams = {
 export const DEFAULT_SETTINGS: Settings = {
   id: 'app',
   theme: 'system',
-  fontFamily: 'dm',
+  displayName: '',
+  onboarded: false,
   defaultModel: '',
   defaultSystem: '',
   defaultParams: DEFAULT_PARAMS,
@@ -183,10 +174,7 @@ const BUILTIN_PRESETS: Array<Omit<Preset, 'id' | 'createdAt'>> = [
 
 let bootstrapping: Promise<Settings> | null = null
 
-/**
- * Crée les réglages et les presets d'origine au premier lancement.
- * Verrouillé : deux appels concurrents ne doivent pas semer les presets deux fois.
- */
+/** Crée les réglages et les presets d'origine au premier lancement. */
 export function bootstrap(defaultModel: string): Promise<Settings> {
   bootstrapping ??= doBootstrap(defaultModel)
   return bootstrapping
@@ -210,10 +198,7 @@ async function doBootstrap(defaultModel: string): Promise<Settings> {
   return settings
 }
 
-/**
- * Les réglages sont fusionnés sur les valeurs d'origine : une base créée avant
- * l'ajout d'une option ne doit pas rendre ce champ indéfini à la lecture.
- */
+/** Les réglages sont fusionnés sur les valeurs d'origine : une base créée avant l'ajout d'une option ne doit pas rendre ce champ indéfini à la lecture. */
 export async function getSettings(): Promise<Settings> {
   const stored = await db.settings.get('app')
   return stored ? { ...DEFAULT_SETTINGS, ...stored } : DEFAULT_SETTINGS
@@ -296,9 +281,7 @@ export async function duplicateConversation(id: string): Promise<string | null> 
   const newId = uid()
   const now = Date.now()
 
-  /* Les images sont recopiées telles quelles, chiffrement compris : la copie
-     hérite de l'état de verrouillage de l'originale, donc de sa clé. Chaque
-     message repointe vers sa propre copie, sinon supprimer l'une viderait l'autre. */
+  // Les images sont recopiées telles quelles, chiffrement compris : la copie hérite de l'état de verrouillage de l'originale, donc de sa clé.
   const pictures = await db.images.where('conversationId').equals(id).toArray()
   const reborn = new Map(pictures.map((p) => [p.id, uid()]))
 
@@ -317,12 +300,7 @@ export async function duplicateConversation(id: string): Promise<string | null> 
   return newId
 }
 
-/**
- * Réglages de diffusion effectifs d'une conversation.
- *
- * Une conversation antérieure à leur existence n'en porte pas : elle suit alors
- * les valeurs par défaut, plutôt que de se retrouver sans modèle d'images.
- */
+/** Réglages de diffusion effectifs d'une conversation. */
 export function imageParamsOf(conv: Conversation | null | undefined, settings: Settings): ImageParams {
   return conv?.imageParams ?? settings.imageParams
 }
@@ -405,10 +383,7 @@ export async function deleteMessagesFrom(conversationId: string, createdAt: numb
   await db.messages.bulkDelete(doomed.map((m) => m.id))
 }
 
-/**
- * Verrouille ou déverrouille une conversation, en rechiffrant tout l'existant.
- * Exige un coffre ouvert : sans clé maîtresse, l'opération n'a aucun sens.
- */
+/** Verrouille ou déverrouille une conversation, en rechiffrant tout l'existant. */
 export async function setConversationLocked(id: string, locked: boolean): Promise<void> {
   if (!hasMaster()) throw new Error('Le coffre doit être ouvert.')
   const conv = await db.conversations.get(id)
@@ -422,9 +397,7 @@ export async function setConversationLocked(id: string, locked: boolean): Promis
   const nextConv: Conversation = { ...openConv, locked: locked ? 1 : 0, updatedAt: Date.now() }
   const nextMsgs = await Promise.all(plain.map((m) => sealMessage(m, locked)))
 
-  /* Les images suivent le même chemin que le texte : on les ramène en clair,
-     puis on les rescelle dans l'état voulu. Sans cela, verrouiller laisserait
-     les images lisibles — précisément la fuite signalée sur les réponses. */
+  // Les images suivent le même chemin que le texte : on les ramène en clair, puis on les rescelle dans l'état voulu.
   const pictures = await db.images.where('conversationId').equals(id).toArray()
   const nextPics = await Promise.all(
     pictures.map(async (row) => {

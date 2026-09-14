@@ -159,7 +159,7 @@ function ConversationRow({
 
 export function Sidebar() {
   const conversations = useConversations() ?? []
-  const { setSettingsOpen, setPresetsOpen, setVaultOpen, sidebarOpen, toggleSidebar } = useUI()
+  const { setVaultOpen, sidebarOpen, toggleSidebar } = useUI()
   const vault = useVault()
   const route = useRoute()
   const activeId = route.name === 'conversation' ? route.id : null
@@ -297,7 +297,7 @@ export function Sidebar() {
           icon={<Boxes className="size-4" />} label="Modèles" active={route.name === 'models'} onClick={() => navigate(href.models())}
           trailing={modelCount ? <span className="font-mono text-[11px] text-fg-subtle">{modelCount}</span> : undefined}
         />
-        <NavRow icon={<Sparkles className="size-4" />} label="Presets" onClick={() => setPresetsOpen(true)} />
+        <NavRow icon={<Sparkles className="size-4" />} label="Presets" onClick={() => navigate(href.presets())} />
         <NavRow
           icon={vault.unlocked ? <LockOpen className="size-4" /> : <Lock className="size-4" />}
           label="Coffre"
@@ -309,7 +309,7 @@ export function Sidebar() {
           }
         />
         <NavRow
-          icon={<SettingsIcon className="size-4" />} label="Réglages" onClick={() => setSettingsOpen(true)}
+          icon={<SettingsIcon className="size-4" />} label="Réglages" onClick={() => navigate(href.settings())}
           trailing={<span className="font-mono text-[11px] text-fg-subtle">{modKey},</span>}
         />
       </div>

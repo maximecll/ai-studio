@@ -55,9 +55,7 @@ export function ChatView({ conv }: { conv: Conversation }) {
   const awaitingImage = awaitingAnswer ? pending?.imageRequest : undefined
   const shown = showFolded ? messages : live
 
-  /* Recoller une réponse déjà présente pousse le modèle à la reproduire au lieu
-     de l'exécuter — mesuré, et insensible à toute consigne. On le signale au
-     moment où c'est encore rattrapable. */
+  // Recoller une réponse déjà présente pousse le modèle à la reproduire au lieu de l'exécuter — mesuré, et insensible à toute consigne.
   const [echoWarning, setEchoWarning] = useState<string | null>(null)
 
   const onSend = useCallback(

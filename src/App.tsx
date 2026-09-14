@@ -18,21 +18,15 @@ import { NotFound } from './components/NotFound'
 import { ConversationInspector, DefaultsInspector } from './components/settings/Inspector'
 import { MemoryModal } from './components/chat/MemoryModal'
 import { VaultModal } from './components/settings/VaultModal'
-import { SettingsModal } from './components/settings/SettingsModal'
-import { PresetsModal } from './components/settings/PresetsModal'
+import { SettingsView } from './components/settings/SettingsView'
+import { PresetsView } from './components/settings/PresetsView'
 import { CommandPalette } from './components/ui/CommandPalette'
 import { ShortcutsModal } from './components/ui/ShortcutsModal'
 import { Toasts } from './components/ui/Toasts'
-
-const UI_FONTS: Record<string, string> = { dm: "'DM Sans'", satoshi: "'Satoshi'", inter: "'Inter'" }
+import { Onboarding } from './components/ui/Onboarding'
 
 function useThemeSync() {
-  const { theme, fontFamily } = useSettings()
-
-  useEffect(() => {
-    localStorage.setItem('studio.font', fontFamily)
-    document.documentElement.style.setProperty('--ui-font', UI_FONTS[fontFamily] ?? UI_FONTS.dm)
-  }, [fontFamily])
+  const { theme } = useSettings()
 
   useEffect(() => {
     localStorage.setItem('studio.theme', theme)
@@ -110,11 +104,11 @@ export function App() {
   useHotkey('mod+n', (e) => { e.preventDefault(); void newConversation() })
   useHotkey('mod+b', (e) => { e.preventDefault(); ui.toggleSidebar() })
   useHotkey('mod+i', (e) => { e.preventDefault(); ui.toggleInspector() })
-  useHotkey('mod+,', (e) => { e.preventDefault(); ui.setSettingsOpen(true) })
+  useHotkey('mod+,', (e) => { e.preventDefault(); navigate(href.settings()) })
   useHotkey('mod+/', (e) => { e.preventDefault(); ui.setShortcutsOpen(true) })
   useHotkey('mod+shift+l', (e) => { e.preventDefault(); useVault.getState().lock() })
   useHotkey('escape', () => {
-    if (streaming && activeId && !ui.paletteOpen && !ui.settingsOpen && !ui.presetsOpen) stop(activeId)
+    if (streaming && activeId && !ui.paletteOpen) stop(activeId)
   })
 
   const active = activeId && conversations ? conversations.find((c) => c.id === activeId) : undefined
@@ -144,6 +138,8 @@ export function App() {
 
       {route.name === 'home' && <View k="home"><HomeView /></View>}
       {route.name === 'models' && <View k="models"><ModelsView /></View>}
+      {route.name === 'settings' && <View k="settings"><SettingsView /></View>}
+      {route.name === 'presets' && <View k="presets"><PresetsView /></View>}
       {route.name === 'notfound' && <View k="404"><NotFound path={route.path} /></View>}
 
       {route.name === 'conversation' && (
@@ -164,9 +160,8 @@ export function App() {
       <VaultModal />
 
       <CommandPalette />
-      <SettingsModal />
-      <PresetsModal />
       <ShortcutsModal />
+      <Onboarding />
       <Toasts />
     </div>
   )

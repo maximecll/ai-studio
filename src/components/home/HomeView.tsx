@@ -31,11 +31,7 @@ const IMAGE_SUGGESTIONS = [
   'Paysage de montagne dans la brume, à l’aquarelle',
 ]
 
-/**
- * Page d'accueil : on écrit d'abord, la conversation naît ensuite.
- * L'UUID est attribué à l'envoi du premier message, puis l'URL bascule
- * sur /c/<uuid> — la session devient adressable.
- */
+/** Page d'accueil : on écrit d'abord, la conversation naît ensuite. */
 export function HomeView() {
   const settings = useSettings()
   const presets = usePresets()
@@ -53,9 +49,7 @@ export function HomeView() {
   const ref = useRef<HTMLTextAreaElement>(null)
   const { inspectorOpen, toggleInspector } = useUI()
 
-  /* Le modèle de l'accueil est celui des nouvelles conversations : une seule
-     source de vérité, partagée avec le panneau de paramètres. Le choix est
-     persisté, donc le sondage de l'inventaire ne peut plus l'écraser. */
+  // Le modèle de l'accueil est celui des nouvelles conversations : une seule source de vérité, partagée avec le panneau de paramètres.
   const model = settings.defaultModel || models[0]?.name || ''
   const setModel = (name: string) => void patchSettings({ defaultModel: name })
 
@@ -65,9 +59,7 @@ export function HomeView() {
     const body = message.trim()
     if (!body) return
 
-    /* En mode image, la conversation naît aussi — mais son premier échange est
-       une description et une image, pas un tour de parole avec un modèle de
-       langage. Le modèle de texte reste celui par défaut, pour la suite. */
+    // En mode image, la conversation naît aussi — mais son premier échange est une description et une image, pas un tour de parole avec un modèle de…
     if (image) {
       const id = await createConversation({ model, params: settings.defaultParams, system: settings.defaultSystem })
       /* On arrive dans la conversation avec le composeur déjà en mode image :
@@ -124,7 +116,7 @@ export function HomeView() {
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
         >
           <h1 className="t-display">
-            {greeting}.
+            {greeting}{settings.displayName ? `, ${settings.displayName}` : ''}.
             <span className="block text-fg-subtle">Par quoi commençons-nous&nbsp;?</span>
           </h1>
 
@@ -232,12 +224,14 @@ export function HomeView() {
                 whileTap={{ scale: 0.97 }}
                 onClick={() => { setText(s); ref.current?.focus() }}
                 className={cn(
-                  'group inline-flex h-9 max-w-full cursor-pointer items-center gap-2 rounded-full border border-line bg-surface px-4',
+                  'group inline-flex h-9 max-w-full cursor-pointer items-center rounded-full border border-line bg-surface px-4',
                   't-meta text-fg-muted transition-colors duration-150 hover:border-line-strong hover:text-fg',
                 )}
               >
                 <span className="truncate">{s}</span>
-                <ArrowUpRight className="size-3.5 text-fg-subtle opacity-0 transition-opacity group-hover:opacity-100" />
+                <ArrowUpRight
+                  className="h-3.5 w-0 shrink-0 overflow-hidden text-fg-subtle opacity-0 transition-all duration-150 group-hover:ml-1.5 group-hover:w-3.5 group-hover:opacity-100"
+                />
               </motion.button>
             ))}
           </div>

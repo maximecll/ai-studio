@@ -1,11 +1,4 @@
-/**
- * Génération d'images.
- *
- * Le pendant de `store/chat` pour la diffusion : une tâche par conversation,
- * suivie pas à pas, puis rangée en base. Les octets ne restent jamais sur le
- * disque du serveur — ils sont récupérés puis effacés du sas, pour que le
- * chiffrement des conversations verrouillées ait un sens.
- */
+/** Génération d'images. */
 import { create } from 'zustand'
 import { addMessage, db, getSettings, putImage, readImage } from '../lib/db'
 import * as images from '../lib/images'
@@ -34,11 +27,7 @@ export interface Job {
   startedAt: number
   /** Durée moyenne d'un pas, lissée — sert à estimer la fin. */
   stepMs: number
-  /**
-   * URL de l'image finie. Elle est donnée à la mosaïque avant que le message
-   * n'existe en base : la révélation se joue donc d'un seul tenant, et le
-   * message prend le relais sur la même image déjà chargée.
-   */
+  /** URL de l'image finie. */
   src?: string
   blobId?: string
   /** Guidage effectivement appliqué — nul sur un modèle distillé. */
@@ -194,9 +183,7 @@ export const useImages = create<State>((set, get) => {
               })
               break
             case 'lora':
-              /* Un fichier prévu pour une autre architecture se charge sans
-                 erreur et n'adapte rien : l'image sortirait identique à celle
-                 du modèle nu, sans que rien ne l'explique. */
+              // Un fichier prévu pour une autre architecture se charge sans erreur et n'adapte rien : l'image sortirait identique à celle du modèle nu, sans que rien…
               if (ev.layers === 0) {
                 toast({
                   title: 'LoRA sans effet',
@@ -393,12 +380,7 @@ export const useImages = create<State>((set, get) => {
 
 /* ── URL des images ───────────────────────────────────────────────── */
 
-/**
- * Une URL d'objet par image, partagée entre la mosaïque qui la révèle et le
- * message qui l'affichera ensuite. Sans ce partage, le passage de l'une à
- * l'autre recréerait une URL, et le navigateur redessinerait l'image — un
- * clignotement au moment précis où l'animation vient de se terminer.
- */
+/** Une URL d'objet par image, partagée entre la mosaïque qui la révèle et le message qui l'affichera ensuite. */
 const urls = new Map<string, string>()
 
 export function holdURL(blobId: string, blob: Blob): string {
