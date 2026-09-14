@@ -1,4 +1,8 @@
-import { CircleAlert, CircleCheck, RefreshCw, Sparkles } from 'lucide-react'
+import { useState } from 'react'
+import { CircleAlert, CircleCheck, Download, Loader2, RefreshCw, Sparkles } from 'lucide-react'
+import { installGit } from '../../lib/setup'
+import { useHardware } from '../../lib/hardware'
+import { formatBytes } from '../../lib/utils'
 import { toast } from '../../store/ui'
 import { useUpdate } from '../../store/update'
 import { Button } from '../ui/primitives'
@@ -18,6 +22,38 @@ export function UpdateSettings() {
   const status = useUpdate((s) => s.status)
   const chargement = useUpdate((s) => s.chargement)
   const refresh = useUpdate((s) => s.refresh)
+
+  const hardware = useHardware()
+  const [pose, setPose] = useState<string | null>(null)
+
+  /** git s'installe depuis l'application : archive portable sous Windows,
+      installateur du système ailleurs. */
+  const poserGit = async () => {
+    setPose('Préparation')
+    try {
+      for await (const ev of installGit()) {
+        if (ev.type === 'phase') setPose(ev.label)
+        if (ev.type === 'progress' && ev.total) {
+          setPose(`Téléchargement — ${formatBytes(ev.completed)} / ${formatBytes(ev.total)}`)
+        }
+        if (ev.type === 'error') {
+          toast({ title: 'Installation de git impossible', description: ev.message, tone: 'danger' })
+          setPose(null)
+          return
+        }
+        if (ev.type === 'done') {
+          toast({ title: 'git est prêt', description: ev.version ? `Version ${ev.version}` : undefined, tone: 'success' })
+          setPose(null)
+          await refresh(true)
+          return
+        }
+      }
+      setPose(null)
+    } catch (e) {
+      toast({ title: 'Installation de git impossible', description: (e as Error).message, tone: 'danger' })
+      setPose(null)
+    }
+  }
 
   const rafraichir = async () => {
     const s = await refresh(true)
@@ -87,7 +123,7 @@ export function UpdateSettings() {
               <CircleAlert className={`mt-0.5 size-4 shrink-0 ${absent ? 'text-negative' : 'text-fg-subtle'}`} />
               <span className="min-w-0">
                 {status.reason}
-                {absent && status.gitInstall && (
+                {absent && hardware?.gitAuto !== 'auto' && status.gitInstall && (
                   <>
                     {' '}
                     <a
@@ -96,9 +132,9 @@ export function UpdateSettings() {
                       rel="noreferrer"
                       className="text-fg underline underline-offset-2"
                     >
-                      Installer git
+                      Le faire à la main
                     </a>
-                    , puis relancez AI Studio.
+                    .
                   </>
                 )}
               </span>
@@ -107,10 +143,29 @@ export function UpdateSettings() {
         </>
       )}
 
-      <Button variant="soft" size="sm" disabled={chargement} onClick={() => void rafraichir()}>
-        <RefreshCw className={chargement ? 'size-4 animate-spin' : 'size-4'} />
-        Rafraîchir
-      </Button>
+      {pose && (
+        <p className="t-caption flex items-center gap-2 rounded-sm bg-surface-2 px-3 py-2.5 text-fg-muted">
+          <Loader2 className="size-4 shrink-0 animate-spin" />
+          {pose}…
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        {absent && (
+          <Button variant="primary" size="sm" disabled={!!pose} onClick={() => void poserGit()}>
+            <Download className="size-4" />
+            {hardware?.gitAuto === 'auto'
+              ? 'Installer git (≈ 56 Mo)'
+              : hardware?.gitAuto === 'apple'
+                ? 'Installer les outils Apple'
+                : 'Installer git'}
+          </Button>
+        )}
+        <Button variant="soft" size="sm" disabled={chargement || !!pose} onClick={() => void rafraichir()}>
+          <RefreshCw className={chargement ? 'size-4 animate-spin' : 'size-4'} />
+          Rafraîchir
+        </Button>
+      </div>
     </div>
   )
 }

@@ -15,6 +15,13 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const RUNTIME = join(ROOT, '.runtime')
 const OLLAMA_DIR = join(RUNTIME, 'ollama')
 const VERSION = 'v0.34.0'
+
+/* Git portable — Windows uniquement : c'est le seul des trois systèmes à ne
+   pas livrer git, et le seul à publier une archive utilisable sans droit
+   administrateur. */
+const GIT_DIR = join(RUNTIME, 'git')
+const GIT_TAG = 'v2.55.0.windows.5'
+const GIT_BUILD = '2.55.0.5'
 const PROBE = new URL(process.env.OLLAMA_HOST ?? 'http://127.0.0.1:11434')
 
 /** Archives portables : ni installateur, ni élévation, ni PATH modifié. */
@@ -83,6 +90,46 @@ async function findOllama() {
 
   const connu = systemPaths().find((p) => existsSync(p))
   return connu ? { bin: connu, source: 'system' } : null
+}
+
+/* ── Git ──────────────────────────────────────────────────────────── */
+
+function portableGit() {
+  const p = platform() === 'win32' ? join(GIT_DIR, 'cmd', 'git.exe') : join(GIT_DIR, 'bin', 'git')
+  return existsSync(p) ? p : null
+}
+
+/** Le git à employer : celui de .runtime s'il existe, celui du système sinon. */
+export function gitBin() {
+  return portableGit() ?? 'git'
+}
+
+async function gitState() {
+  const portable = portableGit()
+  try {
+    const { stdout } = await run(portable ?? 'git', ['--version'], { timeout: 8000 })
+    return { ok: true, version: stdout.trim().replace(/^git version /, ''), source: portable ? 'runtime' : 'system' }
+  } catch {
+    return { ok: false, version: null, source: null }
+  }
+}
+
+/** Gestionnaire de paquets de la distribution, et la commande qui va avec. */
+async function linuxInstaller() {
+  const candidats = [
+    ['apt-get', ['install', '-y', 'git']],
+    ['dnf', ['install', '-y', 'git']],
+    ['pacman', ['-S', '--noconfirm', 'git']],
+    ['zypper', ['install', '-y', 'git']],
+    ['apk', ['add', 'git']],
+  ]
+  for (const [cmd, args] of candidats) {
+    try {
+      await run('which', [cmd], { timeout: 5000 })
+      return { cmd, args }
+    } catch { /* suivant */ }
+  }
+  return null
 }
 
 /* ── Matériel ─────────────────────────────────────────────────────── */
@@ -226,7 +273,14 @@ export async function handle(req, res) {
     if (path === '/status' && req.method === 'GET') {
       const a = asset()
       const trouve = await findOllama()
+      const git = await gitState()
       return json(res, 200, {
+        git: git.ok,
+        gitVersion: git.version,
+        gitSource: git.source,
+        /* Seul Windows s'installe sans intervention : ailleurs l'installateur
+           du système demande une élévation qu'on ne peut pas contourner. */
+        gitAuto: platform() === 'win32' ? 'auto' : platform() === 'darwin' ? 'apple' : 'paquets',
         platform: platform(),
         arch: arch(),
         supported: !!a,
@@ -240,11 +294,104 @@ export async function handle(req, res) {
     }
 
     if (path === '/ollama' && req.method === 'POST') return await install(res)
+    if (path === '/git' && req.method === 'POST') return await installGit(res)
     return json(res, 404, { error: 'Route inconnue.' })
   } catch (e) {
     if (!res.headersSent) return json(res, 500, { error: e.message })
     res.end()
   }
+}
+
+/* ── Installation de git ──────────────────────────────────────────── */
+
+/** Windows n'a pas git, mais Git for Windows publie une archive auto-extractible
+    qui ne demande aucun droit particulier. */
+async function installGitWindows(send) {
+  await mkdir(RUNTIME, { recursive: true })
+  const nom = `PortableGit-${GIT_BUILD}-${arch() === 'arm64' ? 'arm64' : '64-bit'}.7z.exe`
+  const archive = join(RUNTIME, nom)
+
+  send({ type: 'phase', phase: 'downloading', label: 'Téléchargement de git', asset: nom })
+  const t0 = Date.now()
+  await download(
+    `https://github.com/git-for-windows/git/releases/download/${GIT_TAG}/${nom}`,
+    archive,
+    (completed, total) => {
+      const speed = completed / Math.max(0.001, (Date.now() - t0) / 1000)
+      send({ type: 'progress', completed, total, speed, eta: speed > 1 && total ? (total - completed) / speed : null })
+    },
+  )
+
+  send({ type: 'phase', phase: 'extracting', label: 'Installation' })
+  await rm(GIT_DIR, { recursive: true, force: true })
+  // Archive 7-Zip auto-extractible : `-o` sans espace, `-y` pour ne rien demander.
+  await run(archive, [`-o${GIT_DIR}`, '-y'], { timeout: 600000, windowsHide: true })
+  await rm(archive, { force: true })
+
+  if (!portableGit()) throw new Error("L'archive ne contient pas le binaire attendu.")
+}
+
+/** macOS livre git avec les outils en ligne de commande d'Apple. Leur
+    installateur est graphique et demande une élévation : on ne peut que
+    l'ouvrir, puis attendre. */
+async function installGitDarwin(send) {
+  send({ type: 'phase', phase: 'prompting', label: 'Ouverture de l’installateur Apple' })
+  try {
+    await run('xcode-select', ['--install'], { timeout: 15000 })
+  } catch { /* déjà en cours, ou déjà installé */ }
+  send({
+    type: 'phase',
+    phase: 'waiting',
+    label: 'Acceptez la fenêtre « Installer » d’Apple, puis patientez',
+  })
+  for (let i = 0; i < 120; i++) {
+    if ((await gitState()).ok) return
+    await new Promise((r) => setTimeout(r, 5000))
+  }
+  throw new Error("L'installation n'a pas abouti. Relancez-la depuis la fenêtre d'Apple, puis réessayez.")
+}
+
+/** Linux passe par le gestionnaire de paquets : mot de passe obligatoire. */
+async function installGitLinux(send) {
+  const gestionnaire = await linuxInstaller()
+  if (!gestionnaire) throw new Error("Aucun gestionnaire de paquets reconnu. Installez git par vos moyens habituels.")
+  const commande = `sudo ${gestionnaire.cmd} ${gestionnaire.args.join(' ')}`
+
+  let pkexec = true
+  try { await run('which', ['pkexec'], { timeout: 5000 }) } catch { pkexec = false }
+  if (!pkexec) throw new Error(`Ouvrez un terminal et lancez : ${commande}`)
+
+  send({ type: 'phase', phase: 'prompting', label: 'Saisissez votre mot de passe dans la fenêtre du système' })
+  try {
+    await run('pkexec', [gestionnaire.cmd, ...gestionnaire.args], { timeout: 600000 })
+  } catch (e) {
+    throw new Error(`Installation refusée ou interrompue. Ouvrez un terminal et lancez : ${commande} (${e.message})`)
+  }
+}
+
+async function installGit(res) {
+  res.writeHead(200, {
+    'Content-Type': 'application/x-ndjson; charset=utf-8',
+    'Cache-Control': 'no-cache',
+    'X-Accel-Buffering': 'no',
+  })
+  const send = (e) => { if (!res.writableEnded) res.write(JSON.stringify(e) + '\n') }
+
+  try {
+    if ((await gitState()).ok) {
+      send({ type: 'done', already: true })
+      return res.end()
+    }
+    if (platform() === 'win32') await installGitWindows(send)
+    else if (platform() === 'darwin') await installGitDarwin(send)
+    else await installGitLinux(send)
+
+    const etat = await gitState()
+    send(etat.ok ? { type: 'done', version: etat.version } : { type: 'error', message: 'git reste introuvable après installation.' })
+  } catch (e) {
+    send({ type: 'error', message: e.message })
+  }
+  res.end()
 }
 
 async function install(res) {

@@ -20,7 +20,13 @@ Puis double-cliquez le lanceur de votre système :
 
 Aucune commande ensuite. Node.js et Ollama sont téléchargés dans `.runtime` s'ils manquent — archives portables, pas de droit administrateur, pas de `PATH` modifié.
 
-**git** est le seul prérequis. Absent de Windows par défaut : [git-scm.com](https://git-scm.com/downloads).
+**git** sert à cloner puis à recevoir les mises à jour. S'il manque, **Réglages → Mises à jour** l'installe :
+
+| Système | Ce qui se passe |
+| :-- | :-- |
+| 🪟 Windows | Git portable déposé dans `.runtime`, sans droit administrateur |
+| 🍎 macOS | Ouvre l'installateur Apple des outils en ligne de commande |
+| 🐧 Linux | Passe par le gestionnaire de paquets, mot de passe demandé |
 
 Fermer la fenêtre du lanceur arrête le serveur et Ollama.
 
