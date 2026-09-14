@@ -196,7 +196,9 @@ $(why "$LOG/build.log")
 
 Journal : ~/Library/Logs/Studio/build.log"
     fi
-    nohup "$NODE" "$PROJECT/server.mjs" >> "$LOG/server.log" 2>&1 &
+    # Boucle de supervision : sortie 75 = mise à jour appliquée, on repart.
+    nohup sh -c 'while :; do AI_STUDIO_SUPERVISED=1 "$1" "$2" >> "$3" 2>&1; [ $? -eq 75 ] || break; done' \
+      _ "$NODE" "$PROJECT/server.mjs" "$LOG/server.log" >/dev/null 2>&1 &
   fi
 
   # Vite met quelques secondes à se lever la première fois.

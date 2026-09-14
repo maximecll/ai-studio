@@ -24,6 +24,7 @@ import { CommandPalette } from './components/ui/CommandPalette'
 import { ShortcutsModal } from './components/ui/ShortcutsModal'
 import { Toasts } from './components/ui/Toasts'
 import { Onboarding } from './components/ui/Onboarding'
+import { UpdateGate } from './components/ui/UpdateGate'
 
 
 /** Transition douce entre les vues, sans déplacer le châssis. */
@@ -154,6 +155,7 @@ export function App() {
       <CommandPalette />
       <ShortcutsModal />
       <Onboarding />
+      <UpdateGate />
       <Toasts />
     </div>
   )

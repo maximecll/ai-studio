@@ -53,6 +53,28 @@ Aux lancements suivants, le serveur rallume Ollama tout seul s'il le trouve
 
 ---
 
+## Mises à jour
+
+AI Studio surveille le dépôt d'origine. Dès qu'une version est publiée, une
+fenêtre barre l'écran et **il faut l'installer pour continuer** — pas de
+« plus tard » qui laisserait la moitié des machines en retard.
+
+Un clic sur **Mettre à jour** enchaîne tout seul :
+
+```
+git merge --ff-only → npm install (si besoin) → npm run build → redémarrage
+```
+
+Le serveur se termine avec le code `75`, le lanceur le rallume, la page se
+recharge. Rien à taper, quel que soit le système.
+
+> [!NOTE]
+> La fenêtre attend qu'un modèle ait fini de rédiger avant de s'afficher. En
+> cas d'échec — réseau coupé, fichiers modifiés à la main — le message dit
+> pourquoi, et un bouton permet de continuer sans mettre à jour.
+
+---
+
 ## Ce que ça fait
 
 | | |
@@ -161,8 +183,9 @@ src/
               tâches de diffusion
   components/ layout · chat · models · settings · ui
 server.mjs    production : statique + relais Ollama et Hugging Face
-server/       magasin Ollama, mémoire système, installation, moteur d'images
-scripts/      bootstrap · bundle macOS · flux_worker.py
+server/       magasin Ollama, mémoire système, installation, mises à jour,
+              moteur d'images
+scripts/      bootstrap · boucle de supervision · bundle macOS · flux_worker.py
 ```
 
 Les conversations vivent dans IndexedDB (`ollama-studio`). Le streaming passe
