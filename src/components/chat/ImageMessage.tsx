@@ -1,5 +1,5 @@
 import { memo, useCallback, useState } from 'react'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Check, Copy, Download, Image as ImageIcon, RefreshCw, Square, Trash2, TriangleAlert } from 'lucide-react'
 import type { Message as Msg } from '../../lib/types'
 import { useImageURL } from '../../lib/hooks'
@@ -7,6 +7,7 @@ import { cn, formatBytes, formatMs, shortTime } from '../../lib/utils'
 import { jobCaption, type Job } from '../../store/images'
 import { Button, MorphButton, ShakeButton, SpinButton, Tooltip } from '../ui/primitives'
 import { MosaicReveal } from './MosaicReveal'
+import { ImageLightbox } from './ImageLightbox'
 
 const ENTER = {
   initial: { opacity: 0, y: 8 },
@@ -96,6 +97,7 @@ export const ImageMessage = memo(function ImageMessage({
   const meta = message.image!
   const url = useImageURL(meta.blobId)
   const [copied, setCopied] = useState(false)
+  const [agrandie, setAgrandie] = useState(false)
 
   const copy = useCallback(async () => {
     if (!url) return
@@ -138,16 +140,34 @@ export const ImageMessage = memo(function ImageMessage({
     <motion.div {...ENTER} className={cn('group/msg max-w-[94%]', faded && 'opacity-55')}>
       <Header name={meta.modelName} at={message.createdAt} />
 
+      <AnimatePresence>
+        {agrandie && (
+          <ImageLightbox
+            url={url}
+            label={meta.prompt}
+            caption={`${meta.prompt} — ${meta.width} × ${meta.height}`}
+            onClose={() => setAgrandie(false)}
+          />
+        )}
+      </AnimatePresence>
+
       <div style={{ maxWidth: frameWidth(meta.width / meta.height) }}>
         {url ? (
-          <img
-            src={url}
-            alt={meta.prompt}
-            width={meta.width}
-            height={meta.height}
-            className="block w-full rounded-lg"
-            style={{ aspectRatio: meta.width / meta.height }}
-          />
+          <button
+            onClick={() => setAgrandie(true)}
+            className="block w-full cursor-zoom-in"
+            title="Agrandir"
+            aria-label="Agrandir l’image"
+          >
+            <img
+              src={url}
+              alt={meta.prompt}
+              width={meta.width}
+              height={meta.height}
+              className="block w-full rounded-lg"
+              style={{ aspectRatio: meta.width / meta.height }}
+            />
+          </button>
         ) : (
           /* Coffre fermé, ou lecture en cours : on tient la place sans rien montrer. */
           <div

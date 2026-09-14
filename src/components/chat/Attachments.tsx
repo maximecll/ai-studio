@@ -1,62 +1,11 @@
-import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { AnimatePresence, motion } from 'framer-motion'
+import { useState } from 'react'
+import { AnimatePresence } from 'framer-motion'
 import { ImageIcon, X } from 'lucide-react'
+import { ImageLightbox } from './ImageLightbox'
 import { useImageURL } from '../../lib/hooks'
 import type { Pending } from '../../lib/attachments'
 import type { Attachment } from '../../lib/types'
 import { cn, formatBytes } from '../../lib/utils'
-
-/* ── Aperçu plein écran ───────────────────────────────────────────── */
-
-function Preview({ attachment, onClose }: { attachment: Attachment; onClose: () => void }) {
-  const url = useImageURL(attachment.blobId)
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose() } }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  return createPortal(
-    <div className="fixed inset-0 z-80 flex flex-col items-center justify-center p-6 sm:p-10">
-      <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        transition={{ duration: 0.15 }}
-        className="fixed inset-0 bg-black/80 backdrop-blur-[2px]"
-        onClick={onClose}
-        aria-hidden
-      />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.99 }}
-        transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-        role="dialog"
-        aria-modal
-        aria-label={attachment.name}
-        className="relative flex min-h-0 flex-col items-center gap-3"
-      >
-        {url ? (
-          <img src={url} alt={attachment.name} className="max-h-[78vh] max-w-full rounded-lg object-contain shadow-float" />
-        ) : (
-          <span className="t-caption rounded-lg bg-surface px-6 py-10 text-fg-subtle">Image indisponible.</span>
-        )}
-        <span className="t-caption max-w-full truncate text-fg-muted">
-          {attachment.name} · {formatBytes(attachment.size)}
-        </span>
-      </motion.div>
-      <button
-        onClick={onClose}
-        aria-label="Fermer l’aperçu"
-        className="absolute top-5 right-5 flex size-9 cursor-pointer items-center justify-center rounded-full bg-surface text-fg-muted transition-colors hover:text-fg"
-      >
-        <X className="size-4" />
-      </button>
-    </div>,
-    document.body,
-  )
-}
 
 /* ── Badges sous un message ───────────────────────────────────────── */
 
@@ -90,9 +39,21 @@ export function AttachmentBadges({ attachments, align = 'end' }: { attachments: 
         ))}
       </div>
       <AnimatePresence>
-        {ouverte && <Preview attachment={ouverte} onClose={() => setOuverte(null)} />}
+        {ouverte && <ApercuJointe attachment={ouverte} onClose={() => setOuverte(null)} />}
       </AnimatePresence>
     </>
+  )
+}
+
+function ApercuJointe({ attachment, onClose }: { attachment: Attachment; onClose: () => void }) {
+  const url = useImageURL(attachment.blobId)
+  return (
+    <ImageLightbox
+      url={url}
+      label={attachment.name}
+      caption={`${attachment.name} · ${formatBytes(attachment.size)}`}
+      onClose={onClose}
+    />
   )
 }
 
