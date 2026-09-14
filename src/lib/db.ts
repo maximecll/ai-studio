@@ -2,7 +2,7 @@ import Dexie, { type EntityTable } from 'dexie'
 import type { Conversation, Folder, ImageBlob, ImageParams, Message, Params, Preset, Settings } from './types'
 import type { Vault } from './crypto'
 import { fullDate, uid } from './utils'
-import { hasMaster, openConversation, openImage, openMessage, sealConversation, sealImage, sealMessage } from './sealed'
+import { hasMaster, openConversation, openImage, openMessage, sealConversation, sealImage, sealMessage, setMaster } from './sealed'
 import { isSealed } from './crypto'
 
 class StudioDB extends Dexie {
@@ -271,6 +271,17 @@ export async function deleteAllConversations(): Promise<void> {
     await db.images.clear()
     await db.conversations.clear()
   })
+}
+
+/** Remet l'application dans l'état d'une première installation. */
+export async function factoryReset(): Promise<void> {
+  await db.transaction('rw', db.tables, async () => {
+    for (const table of db.tables) await table.clear()
+  })
+  // Le coffre vit aussi en mémoire : sans cela la clé maîtresse survivrait.
+  setMaster(null)
+  localStorage.clear()
+  sessionStorage.clear()
 }
 
 export async function duplicateConversation(id: string): Promise<string | null> {

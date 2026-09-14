@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Download, Trash2, Upload } from 'lucide-react'
-import { db, deleteAllConversations, exportJSON, imagesWeight, importJSON, patchSettings } from '../../lib/db'
+import { Download, MessageSquare, RotateCcw, Upload } from 'lucide-react'
+import { db, deleteAllConversations, exportJSON, factoryReset, imagesWeight, importJSON, patchSettings } from '../../lib/db'
 import { useSettings } from '../../lib/hooks'
 import type { Transcript } from '../../lib/types'
 import { cn, download, formatBytes } from '../../lib/utils'
@@ -65,6 +65,7 @@ export function SettingsView() {
   const settings = useSettings()
   const models = useModels((s) => s.models)
   const [confirmWipe, setConfirmWipe] = useState(false)
+  const [confirmReset, setConfirmReset] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const [counts, setCounts] = useState<{ conv: number; msg: number; img: number; imgBytes: number } | null>(null)
 
@@ -209,7 +210,10 @@ export function SettingsView() {
               }}
             />
             <Button variant="soft" size="sm" className="text-danger" onClick={() => setConfirmWipe(true)}>
-              <Trash2 size={16} /> Tout effacer
+              <MessageSquare size={16} /> Effacer les conversations
+            </Button>
+            <Button variant="soft" size="sm" className="text-danger" onClick={() => setConfirmReset(true)}>
+              <RotateCcw size={16} /> Réinitialiser
             </Button>
           </div>
           <p className="t-caption leading-relaxed text-fg-subtle">
@@ -226,13 +230,27 @@ export function SettingsView() {
         open={confirmWipe}
         onClose={() => setConfirmWipe(false)}
         title="Effacer toutes les conversations ?"
-        description="Les presets et réglages sont conservés. Pensez à exporter avant."
-        confirmLabel="Tout effacer"
+        description="Les presets, les réglages et le coffre sont conservés. Pensez à exporter avant."
+        confirmLabel="Effacer les conversations"
         danger
         onConfirm={async () => {
           await deleteAllConversations()
           navigate(href.home())
           toast({ title: 'Conversations effacées', tone: 'success' })
+        }}
+      />
+
+      <ConfirmModal
+        open={confirmReset}
+        onClose={() => setConfirmReset(false)}
+        title="Réinitialiser AI Studio ?"
+        description="Conversations, images, presets, réglages et coffre : tout est effacé. L'application redémarre comme au premier lancement. Les modèles téléchargés sur le disque ne sont pas touchés."
+        confirmLabel="Tout réinitialiser"
+        danger
+        onConfirm={async () => {
+          await factoryReset()
+          // Rechargement complet : les magasins en mémoire repartent de zéro.
+          location.replace('/')
         }}
       />
     </Page>
