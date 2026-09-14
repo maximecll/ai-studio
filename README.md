@@ -42,7 +42,7 @@ Fermer la fenêtre du lanceur arrête le serveur et Ollama.
 | **Conversations** | Renommage, épinglage, duplication, recherche plein texte, import/export Markdown et JSON. Titres générés par le modèle. |
 | **Inférence** | Température, top-p/k, min-p, pénalités, contexte, graine, mirostat, mode réflexion — par conversation. |
 | **Presets** | Instructions système et paramètres enregistrés, applicables en un clic. |
-| **Modèles** | Recherche Hugging Face (GGUF) et bibliothèque Ollama. Téléchargement avec débit et temps restant, annulable. Chaque modèle installé dit s'il tient sur la carte graphique. |
+| **Modèles** | Recherche Hugging Face (GGUF) et bibliothèque Ollama. Téléchargement avec débit et temps restant, annulable. Chaque quantisation dit si elle tient sur la carte graphique. |
 | **Pièces jointes** | Images déposées, collées ou choisies, lues par les modèles `vision`. Badge cliquable sous le message. |
 | **Images** | Génération locale, dans le fil de conversation. Moteur et modèles selon la machine. |
 | **Chiffrement** | Conversations verrouillables, AES-GCM au repos. |
@@ -51,7 +51,7 @@ Fermer la fenêtre du lanceur arrête le serveur et Ollama.
 
 ### Compatibilité des modèles
 
-Sur la page **Modèles**, chaque modèle de langage installé porte un verdict, calculé à partir de son empreinte estimée et de la mémoire réellement accessible à la carte.
+Sur la page **Modèles**, chaque modèle de langage porte un verdict — les modèles installés comme chaque quantisation proposée à la recherche, avant de télécharger quoi que ce soit.
 
 | Verdict | Signification |
 | :-- | :-- |

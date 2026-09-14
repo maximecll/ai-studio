@@ -111,3 +111,23 @@ export const TONE: Record<Support, 'positive' | 'caution' | 'negative'> = {
   partiel: 'caution',
   non: 'negative',
 }
+
+/** Classes littérales : Tailwind ne génère rien depuis un nom composé. */
+export const BORDURE: Record<Support, string> = {
+  ok: 'border-line hover:border-line-strong',
+  partiel: 'border-caution/35',
+  non: 'border-negative/35',
+}
+
+export const PASTILLE: Record<Support, string> = {
+  ok: 'bg-positive',
+  partiel: 'bg-caution',
+  non: 'bg-negative',
+}
+
+/** Formes courtes, pour les pastilles de quantisation où la place manque. */
+export const COURT: Record<Support, string> = {
+  ok: 'supporté',
+  partiel: 'à moitié',
+  non: 'trop lourd',
+}

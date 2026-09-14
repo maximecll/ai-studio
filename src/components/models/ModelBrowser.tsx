@@ -6,7 +6,8 @@ import type { HfModel, HfQuant } from '../../lib/huggingface'
 import { cn, formatBytes, formatNumber } from '../../lib/utils'
 import { useDownloads } from '../../store/downloads'
 import { useModels } from '../../store/models'
-import { Badge, Input } from '../ui/primitives'
+import { Badge, Input, Tooltip } from '../ui/primitives'
+import { BORDURE, COURT, gpuVerdict, PASTILLE, useHardware } from '../../lib/hardware'
 
 /** Modèles de la bibliothèque Ollama, tirables par leur seul nom. */
 const LIBRARY = [
@@ -25,6 +26,7 @@ function Quants({ repo }: { repo: string }) {
   const [items, setItems] = useState<HfQuant[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const start = useDownloads((s) => s.start)
+  const hardware = useHardware()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -53,22 +55,45 @@ function Quants({ repo }: { repo: string }) {
     )
   }
 
+  /* Avant téléchargement, la forme du modèle est inconnue : le verdict porte
+     sur le poids majoré, sans le cache d'attention. L'info-bulle le dit. */
+  const verdictDe = (poids: number) =>
+    hardware ? gpuVerdict(poids, null, 0, hardware.gpu, hardware.totalRam) : null
+
   return (
     <div className="flex flex-wrap gap-2 px-4 pb-4">
-      {items.map((q) => (
-        <button
-          key={q.label}
-          onClick={() => void start(hf.reference(repo, q.label))}
-          className={cn(
-            'group flex h-9 cursor-pointer items-center gap-2 rounded-full border border-line bg-surface px-3.5',
-            'text-[13px] transition-colors duration-150 hover:border-line-strong hover:bg-fg/[0.04]',
-          )}
-        >
-          <Download className="size-3.5 text-fg-subtle group-hover:text-fg" />
-          <span className="font-mono font-bold text-fg">{q.label}</span>
-          <span className="text-fg-subtle">{formatBytes(q.size)}</span>
-        </button>
-      ))}
+      {items.map((q) => {
+        const v = verdictDe(q.size)
+        const pastille = (
+          <button
+            onClick={() => void start(hf.reference(repo, q.label))}
+            className={cn(
+              'group flex h-9 cursor-pointer items-center gap-2 rounded-full border bg-surface px-3.5',
+              'text-[13px] transition-colors duration-150 hover:bg-fg/[0.04]',
+              v ? BORDURE[v.level] : 'border-line hover:border-line-strong',
+            )}
+          >
+            <Download className="size-3.5 text-fg-subtle group-hover:text-fg" />
+            <span className="font-mono font-bold text-fg">{q.label}</span>
+            <span className="text-fg-subtle">{formatBytes(q.size)}</span>
+            {v && (
+              <span className="flex items-center gap-1.5 border-l border-line pl-2.5 text-fg-muted">
+                <span className={cn('size-1.5 shrink-0 rounded-full', PASTILLE[v.level])} />
+                {COURT[v.level]}
+              </span>
+            )}
+          </button>
+        )
+        return v
+          ? <Tooltip key={q.label} label={`${v.label} — ${v.tip}`} side="top">{pastille}</Tooltip>
+          : <span key={q.label}>{pastille}</span>
+      })}
+      {hardware && (
+        <p className="t-caption w-full text-fg-subtle">
+          Compatibilité estimée sur le poids du fichier : le cache d’attention, qui dépend du contexte,
+          s’y ajoutera une fois le modèle installé.
+        </p>
+      )}
     </div>
   )
 }
