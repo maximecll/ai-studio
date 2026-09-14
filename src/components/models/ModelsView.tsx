@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import {
-  Boxes, Brain, Cpu, Eye, HardDrive, MessageSquare,
+  Boxes, Brain, Cpu, Eye, MessageSquare,
   MessageSquarePlus, PowerOff, RefreshCw, Trash2, Wrench,
 } from 'lucide-react'
 import { createConversation } from '../../lib/db'
@@ -18,6 +18,7 @@ import { toast } from '../../store/ui'
 import { Badge, Button, ConfirmModal, Tooltip } from '../ui/primitives'
 import { href, navigate } from '../../lib/router'
 import { Page } from '../layout/Page'
+import { OllamaSetup } from './OllamaSetup'
 
 const CAPABILITIES: Record<string, { label: string; icon: React.ReactNode }> = {
   completion: { label: 'Texte', icon: <MessageSquare className="size-3" /> },
@@ -175,7 +176,7 @@ function ModelCard({ model, loaded }: { model: OllamaModel; loaded?: OllamaModel
 }
 
 export function ModelsView() {
-  const { models, running, status, error, version, refresh } = useModels()
+  const { models, running, status, version, refresh } = useModels()
   const [spinning, setSpinning] = useState(false)
 
   useEffect(() => { void refresh() }, [refresh])
@@ -237,17 +238,7 @@ export function ModelsView() {
               </div>
             </div>
           )}
-
-          {status === 'offline' && (
-            <div className="flex items-start gap-3 rounded-lg border border-danger/25 bg-negative-wash p-6">
-              <HardDrive size={16} className="mt-0.5 shrink-0 text-danger" />
-              <div>
-                <p className="text-[15px] font-bold text-danger">Ollama est injoignable</p>
-                <p className="mt-1 text-[14px] text-fg-muted">{error}</p>
-                <p className="mt-2 rounded-sm bg-surface px-3 py-2 font-mono text-[13px] text-fg-muted">ollama serve</p>
-              </div>
-            </div>
-          )}
+        <OllamaSetup onReady={() => void refresh()} />
 
           <ModelBrowser />
           <Downloads />

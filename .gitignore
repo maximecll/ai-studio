@@ -16,7 +16,8 @@ dist/
 # Se retélécharge tout seul ; ne doit jamais partir dans le dépôt.
 .runtime/
 
-# Réglages locaux d'éditeur
+# Réglages locaux d'éditeur et d'outils
 .vscode/
 .idea/
+.claude/
 tsconfig.tsbuildinfo

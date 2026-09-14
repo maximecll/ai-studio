@@ -366,8 +366,7 @@ Seul un contexte vierge y échappe. La note de relais que j'avais ajoutée a don
       mécanisme est écrit et branché, mais jamais vu tourner de bout en bout
       (le compactage exige un appel au modèle, lent sur la machine).
 - [ ] **DNS local `ai-studio.local`** — bail statique, entrée DNS sur la box,
-      certificat `mkcert`. Marche à suivre écrite dans `deploy/RESEAU-LOCAL.md`,
-      reste à exécuter. Sans HTTPS, pas de WebCrypto, donc pas de chiffrement.
+      certificat `mkcert`. reste à exécuter. Sans HTTPS, pas de WebCrypto, donc pas de chiffrement.
 - [ ] **Agents de session** — `bash scripts/install-daemons.sh` pour qu'Ollama
       et Studio démarrent à l'ouverture de session. Écrit, pas encore lancé
       (configuration persistante de la machine).
