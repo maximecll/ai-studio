@@ -61,10 +61,19 @@ export function App() {
   const vaultUnlocked = useVault((s) => s.unlocked)
   useEffect(() => { void loadVault() }, [loadVault])
 
+  /* Hors ligne, on espace les sondages : chaque échec salit la console du
+     navigateur et n'apprend rien de plus. */
   useEffect(() => {
+    let vivant = true
+    let timer: number
+    const tick = async () => {
+      await refresh(true)
+      if (!vivant) return
+      timer = window.setTimeout(() => void tick(), useModels.getState().status === 'offline' ? 60_000 : 15_000)
+    }
     void refresh()
-    const id = setInterval(() => void refresh(true), 15_000)
-    return () => clearInterval(id)
+    timer = window.setTimeout(() => void tick(), 15_000)
+    return () => { vivant = false; clearTimeout(timer) }
   }, [refresh])
 
   useEffect(() => {

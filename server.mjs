@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { handle as handleBlobs } from './server/blobs.mjs'
 import { handle as handleMemory } from './server/system.mjs'
 import { handle as handleImages } from './server/images.mjs'
-import { handle as handleSetup } from './server/setup.mjs'
+import { ensureOllama, handle as handleSetup, stopOllama } from './server/setup.mjs'
 
 const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)))
 const DIST = join(ROOT, 'dist')
@@ -127,7 +127,7 @@ const server = secure
   ? createSecureServer({ cert: readFileSync(CERT), key: readFileSync(KEY) }, handle)
   : createServer(handle)
 
-server.listen(PORT, HOST, () => {
+server.listen(PORT, HOST, async () => {
   const scheme = secure ? 'https' : 'http'
   console.log(`AI Studio → ${scheme}://${HOST}:${PORT}  (Ollama : ${OLLAMA.origin})`)
   if (!secure && HOST !== '127.0.0.1' && HOST !== 'localhost') {
@@ -136,4 +136,16 @@ server.listen(PORT, HOST, () => {
       '           Le chiffrement des conversations sera indisponible.',
     )
   }
+
+  const etat = await ensureOllama()
+  if (etat === 'lance') console.log('Ollama démarré.')
+  if (etat === 'absent') console.log("Ollama introuvable : installez-le depuis la page Modèles.")
+  if (etat === 'muet') console.warn("Ollama a été lancé mais ne répond pas sur le port 11434.")
 })
+
+for (const signal of ['exit', 'SIGINT', 'SIGTERM']) {
+  process.on(signal, () => {
+    stopOllama()
+    if (signal !== 'exit') process.exit(0)
+  })
+}

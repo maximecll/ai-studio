@@ -15,6 +15,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const RUNTIME = join(ROOT, '.runtime')
 const OLLAMA_DIR = join(RUNTIME, 'ollama')
 const VERSION = 'v0.34.0'
+const PROBE = new URL(process.env.OLLAMA_HOST ?? 'http://127.0.0.1:11434')
 
 /** Archives portables : ni installateur, ni élévation, ni PATH modifié. */
 function asset() {
@@ -112,7 +113,7 @@ let started = null
 
 function reachable() {
   return new Promise((ok) => {
-    const req = getHttp('http://127.0.0.1:11434/api/version', { timeout: 2000 }, (res) => {
+    const req = getHttp(new URL('/api/version', PROBE), { timeout: 2000 }, (res) => {
       res.resume()
       ok(res.statusCode === 200)
     })
@@ -121,11 +122,50 @@ function reachable() {
   }).catch(() => false)
 }
 
+/** Binaire portable, sinon une installation classique trouvée dans le PATH. */
+async function anyBinary() {
+  const local = localBinary()
+  if (local) return local
+  try {
+    const { stdout } = await run(platform() === 'win32' ? 'where' : 'which', ['ollama'], { timeout: 5000 })
+    return stdout.split(/\r?\n/)[0].trim() || null
+  } catch {
+    return null
+  }
+}
+
 function startOllama(bin) {
   if (started && started.exitCode === null) return started
-  started = spawn(bin, ['serve'], { stdio: 'ignore', detached: true })
+  started = spawn(bin, ['serve'], { stdio: 'ignore', detached: true, windowsHide: true })
   started.unref()
   return started
+}
+
+async function waitUp(tries = 60) {
+  for (let i = 0; i < tries; i++) {
+    if (await reachable()) return true
+    await new Promise((r) => setTimeout(r, 500))
+  }
+  return false
+}
+
+/** Au démarrage du serveur : Ollama installé mais éteint, on l'allume. */
+export async function ensureOllama() {
+  if (await reachable()) return 'deja-lance'
+  const bin = await anyBinary()
+  if (!bin) return 'absent'
+  startOllama(bin)
+  return (await waitUp()) ? 'lance' : 'muet'
+}
+
+/** N'arrête que le processus qu'on a nous-mêmes lancé. */
+export function stopOllama() {
+  if (!started || started.exitCode !== null) return
+  try {
+    if (platform() === 'win32') started.kill()
+    else process.kill(-started.pid)
+  } catch { /* déjà parti */ }
+  started = null
 }
 
 /* ── Routes ───────────────────────────────────────────────────────── */
@@ -204,10 +244,7 @@ async function install(res) {
     if (!(await reachable())) {
       send({ type: 'phase', phase: 'starting', label: 'Démarrage d’Ollama' })
       startOllama(bin)
-      for (let i = 0; i < 60; i++) {
-        if (await reachable()) break
-        await new Promise((r) => setTimeout(r, 500))
-      }
+      await waitUp()
     }
 
     const up = await reachable()

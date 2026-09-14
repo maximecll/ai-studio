@@ -37,6 +37,8 @@ Puis **double-cliquez** sur le lanceur de votre système :
 
 Au premier lancement, un didacticiel vous accueille et la page **Modèles**
 détecte votre carte graphique pour vous proposer ce qui tient en mémoire.
+Aux lancements suivants, le serveur rallume Ollama tout seul s'il le trouve
+éteint.
 
 <details>
 <summary><strong>Options supplémentaires</strong></summary>

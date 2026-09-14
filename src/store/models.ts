@@ -39,9 +39,10 @@ export const useModels = create<ModelsState>((set, get) => ({
   async refresh(silent = false) {
     if (!silent && get().status !== 'online') set({ status: 'loading' })
     try {
-      const [version, models, running] = await Promise.all([
-        ollama.version(), ollama.list(), ollama.running(),
-      ])
+      /* Une seule requête tant qu'Ollama est éteint : les deux autres
+         échoueraient de la même façon. */
+      const version = await ollama.version()
+      const [models, running] = await Promise.all([ollama.list(), ollama.running()])
       models.sort((a, b) => a.name.localeCompare(b.name))
       /* Conserver la référence quand l'inventaire est identique : sinon chaque
          sondage propage un rendu inutile dans toute l'interface. */
