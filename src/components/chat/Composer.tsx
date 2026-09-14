@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { Brain, Check, ChevronDown, Circle, Image as ImageIcon, Paperclip, Send, Square, TriangleAlert } from 'lucide-react'
+import { Brain, Check, ChevronDown, Circle, Paperclip } from 'lucide-react'
 import { imageParamsOf, updateConversation } from '../../lib/db'
 import { usePresets } from '../../lib/hooks'
 import type { Conversation, ImageParams, Settings } from '../../lib/types'
-import { cn, estimateTokens, formatCompact, formatNumber, modKey } from '../../lib/utils'
+import { cn, estimateTokens, formatCompact } from '../../lib/utils'
 import { hasCapability, prettyModel } from '../../lib/ollama'
 import { PresetGlyph } from '../../lib/preset-icons'
 import { findModel, useModels } from '../../store/models'
 import { useChat } from '../../store/chat'
-import { Button, Chip, Menu, MenuItem, MenuLabel, MenuSeparator, MorphButton, Tooltip } from '../ui/primitives'
+import { Button, Chip, Menu, MenuItem, MenuLabel, MenuSeparator, Tooltip } from '../ui/primitives'
+import { ChatComposer } from '@astryxdesign/core/Chat'
 import { useAttachments } from '../../lib/attachments'
 import { PendingStrip } from './Attachments'
 import { href, navigate } from '../../lib/router'
@@ -141,7 +142,7 @@ export function Composer({
   const ref = useRef<HTMLTextAreaElement>(null)
   const fichierRef = useRef<HTMLInputElement>(null)
   const jointes = useAttachments()
-  const [survol, setSurvol] = useState(false)
+  const [, setSurvol] = useState(false)
   const [mode, setMode] = useComposerMode(conversation.id)
   const { engine } = useImageEngine()
   const hasImageModel = (engine?.catalog ?? []).some((m) => m.installed)
@@ -182,24 +183,6 @@ export function Composer({
     jointes.clear()
   }
 
-  /* Une capture d'écran collée arrive dans `files` : autant la joindre. */
-  const onPaste = (e: React.ClipboardEvent) => {
-    if (image) return
-    const fichiers = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'))
-    if (!fichiers.length) return
-    e.preventDefault()
-    void jointes.add(fichiers)
-  }
-
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key !== 'Enter') return
-    const withMod = e.metaKey || e.ctrlKey
-    if (settings.sendOnEnter ? !e.shiftKey && !withMod : withMod) {
-      e.preventDefault()
-      submit()
-    }
-  }
-
   const ctxMax = conversation.params.num_ctx ?? 4096
   const used = usedTokens + estimateTokens(text)
   const filled = Math.min(1, used / ctxMax)
@@ -207,54 +190,36 @@ export function Composer({
 
   return (
     <div className="px-6 pt-2 pb-6">
-      <div className="mx-auto w-full max-w-[860px]">
-        <div
-          onDragOver={(e) => { if (!image) { e.preventDefault(); setSurvol(true) } }}
-          onDragLeave={() => setSurvol(false)}
-          onDrop={(e) => {
-            if (image) return
-            e.preventDefault()
-            setSurvol(false)
-            void jointes.add(e.dataTransfer.files)
-          }}
-          className={cn(
-            'rounded-lg bg-surface transition-shadow duration-200',
-            'shadow-card focus-within:shadow-float',
-            survol && 'ring-2 ring-accent',
-          )}
-        >
-          <PendingStrip items={jointes.items} onRemove={jointes.remove} />
-          {aveugle && (
-            <p className="t-caption flex items-start gap-2 px-5 pt-2 text-caution">
-              <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-              {prettyModel(conversation.model ?? '')} ne lit pas les images — choisissez un modèle « vision ».
-            </p>
-          )}
-          <textarea
-            ref={ref}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onPaste={onPaste}
-            onKeyDown={onKeyDown}
-            rows={1}
-            placeholder={
-              busy
-                ? 'Génération en cours…'
-                : image
-                  ? 'Décrivez l’image à produire…'
-                  : 'Écrivez votre message…'
-            }
-            className={cn(
-              'block max-h-[40vh] min-h-12 w-full resize-none bg-transparent px-5 pt-4 pb-1',
-              'text-[15px] leading-[1.6] text-fg outline-none scroll-thin placeholder:text-fg-subtle',
-            )}
-          />
-
-          {/* Barre de pilotage : modèle, preset, contexte, envoi — tout à la même hauteur. */}
-          {/* Groupe de gauche compressible, groupe de droite intouchable :
-              le bouton d'envoi reste dans la carte à toute largeur. */}
-          <div className="flex h-14 items-center gap-1.5 px-3">
-            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+      <div
+        className="mx-auto w-full max-w-[860px]"
+        onDragOver={(e) => { if (!image) { e.preventDefault(); setSurvol(true) } }}
+        onDragLeave={() => setSurvol(false)}
+        onDrop={(e) => {
+          if (image) return
+          e.preventDefault()
+          setSurvol(false)
+          void jointes.add(e.dataTransfer.files)
+        }}
+      >
+        <ChatComposer
+          value={text}
+          onChange={setText}
+          onSubmit={submit}
+          onStop={onStop}
+          isStopShown={busy}
+          placeholder={image ? 'Décrivez l’image à produire…' : 'Écrivez votre message…'}
+          density="balanced"
+          drawer={jointes.items.length ? <PendingStrip items={jointes.items} onRemove={jointes.remove} /> : undefined}
+          status={aveugle ? { type: 'warning', message: `${prettyModel(conversation.model ?? '')} ne lit pas les images — choisissez un modèle « vision ».` } : undefined}
+          headerContext={
+            !image ? (
+              <span className={cn('font-mono text-[11px] tabular-nums', tight ? 'text-caution' : 'text-fg-subtle')}>
+                {formatCompact(used)} / {formatCompact(ctxMax)}
+              </span>
+            ) : undefined
+          }
+          footerActions={
+            <div className="flex min-w-0 items-center gap-1.5">
               <ModeToggle mode={mode} onChange={setMode} ready={hasImageModel} />
               {image ? (
                 <ImageControls
@@ -277,62 +242,27 @@ export function Composer({
                 </>
               )}
             </div>
-
-            <div className="flex shrink-0 items-center gap-2">
-              {!image && (
-                <>
-                  <input
-                    ref={fichierRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    hidden
-                    onChange={(e) => { void jointes.add(e.target.files); e.target.value = '' }}
-                  />
-                  <Tooltip label="Joindre une image — ou la déposer ici, ou la coller" side="top">
-                    <Button size="icon-sm" onClick={() => fichierRef.current?.click()}>
-                      <Paperclip className="size-4" />
-                    </Button>
-                  </Tooltip>
-                </>
-              )}
-
-              {!image && <Tooltip
-                label={`${formatNumber(used)} jetons sur ${formatNumber(ctxMax)} — ${Math.round(filled * 100)} % du contexte`}
-                side="top"
-              >
-                <span className="hidden items-center gap-2 pr-1 sm:flex">
-                  <span className="h-1 w-10 overflow-hidden rounded-full bg-fg/[0.08]">
-                    <span
-                      className={cn('block h-full rounded-full transition-[width] duration-300', tight ? 'bg-caution' : 'bg-fg/35')}
-                      style={{ width: `${Math.max(3, filled * 100)}%` }}
-                    />
-                  </span>
-                  <span className={cn('font-mono text-[11px] tabular-nums whitespace-nowrap', tight ? 'text-caution' : 'text-fg-subtle')}>
-                    {formatCompact(used)} / {formatCompact(ctxMax)}
-                  </span>
-                </span>
-              </Tooltip>}
-
-              {busy ? (
-                <Button variant="soft" size="icon" onClick={onStop} title="Arrêter (Échap)" aria-label="Arrêter">
-                  <Square className="size-3 fill-current" />
-                </Button>
-              ) : (
-                <MorphButton
-                  idle={image ? ImageIcon : Send} hover={Check} variant="primary" size="icon"
-                  iconClassName={image ? undefined : 'translate-x-px -translate-y-px'}
-                  title={
-                    image
-                      ? 'Produire l’image'
-                      : settings.sendOnEnter ? 'Envoyer (Entrée)' : `Envoyer (${modKey}+Entrée)`
-                  }
-                  disabled={!text.trim() && (image || !jointes.files.length)} onClick={submit}
+          }
+          sendActions={
+            !image ? (
+              <>
+                <input
+                  ref={fichierRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  hidden
+                  onChange={(e) => { void jointes.add(e.target.files); e.target.value = '' }}
                 />
-              )}
-            </div>
-          </div>
-        </div>
+                <Tooltip label="Joindre une image — ou la déposer ici, ou la coller" side="top">
+                  <Button size="icon-sm" onClick={() => fichierRef.current?.click()}>
+                    <Paperclip className="size-4" />
+                  </Button>
+                </Tooltip>
+              </>
+            ) : undefined
+          }
+        />
       </div>
     </div>
   )
