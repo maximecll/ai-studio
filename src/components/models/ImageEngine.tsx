@@ -267,8 +267,15 @@ function LoraLibrary() {
   const library = useImages((s) => s.library)
   const folder = useImages((s) => s.loraFolder)
   const refreshLoras = useImages((s) => s.refreshLoras)
+  const engine = useImages((s) => s.engine)
 
-  useEffect(() => { void refreshLoras() }, [refreshLoras])
+  /* Sans moteur ni modèle d'images installé, un LoRA ne peut s'appliquer à
+     rien : la bibliothèque n'aurait aucun sens sur cette page. */
+  const utile = !!engine?.ready && (engine.catalog ?? []).some((m) => m.installed && m.loraTarget)
+
+  useEffect(() => { if (utile) void refreshLoras() }, [utile, refreshLoras])
+
+  if (!utile) return null
 
   return (
     <section className="overflow-hidden rounded-lg bg-surface shadow-card">
