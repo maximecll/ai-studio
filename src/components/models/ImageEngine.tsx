@@ -207,7 +207,7 @@ function Install() {
         <div className="min-w-0 flex-1">
           <p className="t-ui font-bold">Le moteur d’images n’est pas installé</p>
           <p className="t-meta mt-1.5 text-fg-muted">
-            Ollama ne sait pas générer d’images. Studio s’appuie donc sur mflux, le portage MLX de FLUX,
+            Ollama ne sait pas générer d’images. AI Studio s’appuie donc sur mflux, le portage MLX de FLUX,
             qui tourne nativement sur la puce Apple. L’installation crée un environnement Python à part,
             dans le dossier de l’application — environ 2 Go, sans rien toucher au reste du système.
           </p>
@@ -374,7 +374,7 @@ export function ImageEngine() {
         </p>
       ) : !engine ? (
         <p className="t-meta px-5 py-6 text-fg-muted">
-          Le serveur de Studio ne répond pas. La génération d’images passe par lui : lancez l’application
+          Le serveur d’AI Studio ne répond pas. La génération d’images passe par lui : lancez l’application
           depuis son raccourci plutôt que d’ouvrir le fichier directement.
         </p>
       ) : !engine.ready ? (

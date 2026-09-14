@@ -204,7 +204,7 @@ export function Sidebar() {
           onClick={() => navigate(href.home())}
           className="flex h-8 cursor-pointer items-center gap-2 rounded-full px-2 transition-colors hover:bg-fg/[0.05]"
         >
-          <span className="text-[15px] leading-none font-bold tracking-[-0.02em]">Studio</span>
+          <span className="text-[15px] leading-none font-bold tracking-[-0.02em]">AI Studio</span>
           <StatusDot />
         </button>
         <div className="ml-auto flex items-center gap-0.5">

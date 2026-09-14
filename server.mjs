@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Serveur local de Studio.
+ * Serveur local d'AI Studio.
  * - sert le build statique de `dist/`
  * - relaie `/ollama/*` vers Ollama (évite toute configuration CORS)
  * - expose `/images/*`, la génération d'images par FLUX (cf. server/images.mjs)
@@ -26,7 +26,7 @@ const OLLAMA = new URL(process.env.OLLAMA_HOST ?? 'http://127.0.0.1:11434')
 /**
  * HTTPS facultatif. Indispensable dès qu'on sort de localhost : les
  * navigateurs réservent WebCrypto — donc le chiffrement — aux contextes
- * sécurisés. Certificat local recommandé : `mkcert lab.cm-it.fr`.
+ * sécurisés. Certificat local recommandé : `mkcert ai-studio.local`.
  */
 const CERT = process.env.STUDIO_CERT
 const KEY = process.env.STUDIO_KEY
@@ -137,7 +137,7 @@ const server = secure
 
 server.listen(PORT, HOST, () => {
   const scheme = secure ? 'https' : 'http'
-  console.log(`Studio → ${scheme}://${HOST}:${PORT}  (Ollama : ${OLLAMA.origin})`)
+  console.log(`AI Studio → ${scheme}://${HOST}:${PORT}  (Ollama : ${OLLAMA.origin})`)
   if (!secure && HOST !== '127.0.0.1' && HOST !== 'localhost') {
     console.warn(
       "Attention : sans HTTPS, les navigateurs désactivent WebCrypto hors localhost.\n" +

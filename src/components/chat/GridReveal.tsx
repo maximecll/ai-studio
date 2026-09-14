@@ -7,7 +7,7 @@
  * en approchant de la fin et ne peut donc jamais terminer avant elle.
  *
  * Source : rareui.com/components/gridreveal — repris tel quel, aux imports et
- * aux couleurs près, qui suivent la palette de Studio.
+ * aux couleurs près, qui suivent la palette d'AI Studio.
  */
 import { useEffect, useRef, useState } from 'react'
 import type { ComponentProps } from 'react'

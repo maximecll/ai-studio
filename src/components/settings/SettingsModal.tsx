@@ -248,7 +248,7 @@ export function SettingsModal() {
 
         <Group title="À propos">
           <p className="text-[14px] leading-relaxed text-fg-muted">
-            Studio est une interface locale pour Ollama : les conversations vivent dans ce navigateur,
+            AI Studio est une interface locale pour Ollama : les conversations vivent dans ce navigateur,
             l'inférence tourne sur votre machine. Aucun serveur, aucun compte, aucune télémétrie.
           </p>
           <p className="font-mono text-[12px] text-fg-subtle">

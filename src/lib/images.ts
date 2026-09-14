@@ -24,7 +24,7 @@ async function req(path: string, init?: RequestInit): Promise<Response> {
     res = await fetch(BASE + path, init)
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e
-    throw new ImageError("Le serveur de Studio ne répond pas. L'application est-elle bien lancée ?")
+    throw new ImageError("Le serveur d'AI Studio ne répond pas. L'application est-elle bien lancée ?")
   }
   if (!res.ok) {
     const detail = await res.text().catch(() => '')
