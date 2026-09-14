@@ -105,6 +105,7 @@ d'installation quand il manque.
 | 🎛️ **Réglages d'inférence** | Température, top-p/k, min-p, pénalités, contexte, graine, mirostat, mode réflexion — par conversation. |
 | 📚 **Presets** | Instructions système et paramètres enregistrés, applicables en un clic. |
 | 📦 **Modèles** | Recherche Hugging Face (GGUF, par popularité) et bibliothèque Ollama. Téléchargement avec débit et temps restant, annulable. |
+| 📎 **Pièces jointes** | Images glissées, collées ou choisies ; les modèles « vision » les lisent. Le nom reste cliquable sous le message pour revoir l'image. |
 | 🖼️ **Images** | FLUX.1 en local, dans le fil de conversation. |
 | 🔐 **Chiffrement** | Conversations verrouillables, chiffrées au repos (AES-GCM). |
 | 📊 **Mesures** | Entropie par jeton, perplexité, confiance, débit, latence, jauge de contexte. |

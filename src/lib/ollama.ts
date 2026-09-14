@@ -109,7 +109,8 @@ export const ollama = {
   /** Flux de conversation. Renvoie les morceaux bruts de l'API. */
   async *chat(opts: {
     model: string
-    messages: Array<Pick<Message, 'role' | 'content'>>
+    /** `images` : base64 nu, ce qu'attend Ollama pour les modèles à vision. */
+    messages: Array<Pick<Message, 'role' | 'content'> & { images?: string[] }>
     params?: Params
     think?: boolean
     keepAlive?: string
@@ -119,7 +120,11 @@ export const ollama = {
   }) {
     const body: Record<string, unknown> = {
       model: opts.model,
-      messages: opts.messages.map((m) => ({ role: m.role, content: m.content })),
+      messages: opts.messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+        ...(m.images?.length ? { images: m.images } : null),
+      })),
       stream: true,
       options: cleanParams(opts.params ?? {}),
     }

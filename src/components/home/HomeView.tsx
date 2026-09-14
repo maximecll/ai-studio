@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowUpRight, Check, ChevronDown, Circle, Clock, Image as ImageIcon, Send, SlidersHorizontal } from 'lucide-react'
+import { ArrowUpRight, Check, ChevronDown, Circle, Clock, Image as ImageIcon, Paperclip, Send, SlidersHorizontal } from 'lucide-react'
 import { createConversation, patchSettings, updateConversation } from '../../lib/db'
 import { useConversations, usePresets, useSettings } from '../../lib/hooks'
 import { PresetGlyph } from '../../lib/preset-icons'
@@ -12,6 +12,8 @@ import { useModels } from '../../store/models'
 import { useChat } from '../../store/chat'
 import { useImages } from '../../store/images'
 import { ImageControls, ModeToggle, useImageEngine } from '../chat/ImageControls'
+import { useAttachments } from '../../lib/attachments'
+import { PendingStrip } from '../chat/Attachments'
 import { useUI } from '../../store/ui'
 import { Button, Chip, Menu, MenuItem, MenuLabel, MorphButton, Tooltip } from '../ui/primitives'
 
@@ -43,6 +45,8 @@ export function HomeView() {
   const hasImageModel = (engine?.catalog ?? []).some((m) => m.installed)
 
   const [text, setText] = useState('')
+  const jointes = useAttachments()
+  const fichierRef = useRef<HTMLInputElement>(null)
   const [mode, setMode] = useState<'text' | 'image'>('text')
   const image = mode === 'image' && hasImageModel
   const [preset, setPreset] = useState<Preset | null>(null)
@@ -57,10 +61,11 @@ export function HomeView() {
 
   const start = async (message: string) => {
     const body = message.trim()
-    if (!body) return
+    if (!body && !jointes.files.length) return
 
     // En mode image, la conversation naît aussi — mais son premier échange est une description et une image, pas un tour de parole avec un modèle de…
     if (image) {
+      if (!body) return
       const id = await createConversation({ model, params: settings.defaultParams, system: settings.defaultSystem })
       /* On arrive dans la conversation avec le composeur déjà en mode image :
          on enchaîne rarement une image et une question. */
@@ -87,7 +92,9 @@ export function HomeView() {
       })
     }
     navigate(href.conversation(id))
-    void send(id, body)
+    const fichiers = jointes.files
+    jointes.clear()
+    void send(id, body, fichiers)
   }
 
   const hour = new Date().getHours()
@@ -120,11 +127,23 @@ export function HomeView() {
             <span className="block text-fg-subtle">Par quoi commençons-nous&nbsp;?</span>
           </h1>
 
-          <div className="mt-8 rounded-lg bg-surface shadow-card transition-shadow duration-200 focus-within:shadow-float">
+          <div
+            className="mt-8 rounded-lg bg-surface shadow-card transition-shadow duration-200 focus-within:shadow-float"
+            onDragOver={(e) => { if (!image) e.preventDefault() }}
+            onDrop={(e) => { if (image) return; e.preventDefault(); void jointes.add(e.dataTransfer.files) }}
+          >
+            <PendingStrip items={jointes.items} onRemove={jointes.remove} />
             <textarea
               ref={ref}
               value={text}
               onChange={(e) => setText(e.target.value)}
+              onPaste={(e) => {
+                if (image) return
+                const fichiers = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'))
+                if (!fichiers.length) return
+                e.preventDefault()
+                void jointes.add(fichiers)
+              }}
               onKeyDown={(e) => {
                 if (e.key !== 'Enter') return
                 const withMod = e.metaKey || e.ctrlKey
@@ -197,7 +216,24 @@ export function HomeView() {
                 </>
               )}
               </div>
-              <div className="shrink-0">
+              <div className="flex shrink-0 items-center gap-2">
+                {!image && (
+                  <>
+                    <input
+                      ref={fichierRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      hidden
+                      onChange={(e) => { void jointes.add(e.target.files); e.target.value = '' }}
+                    />
+                    <Tooltip label="Joindre une image" side="top">
+                      <Button size="icon-sm" onClick={() => fichierRef.current?.click()}>
+                        <Paperclip className="size-4" />
+                      </Button>
+                    </Tooltip>
+                  </>
+                )}
                 <MorphButton
                   idle={image ? ImageIcon : Send} hover={Check} variant="primary" size="icon"
                   iconClassName={image ? undefined : 'translate-x-px -translate-y-px'}
@@ -206,7 +242,7 @@ export function HomeView() {
                       ? 'Produire l’image'
                       : settings.sendOnEnter ? 'Envoyer (Entrée)' : `Envoyer (${modKey}+Entrée)`
                   }
-                  disabled={!text.trim() || (!image && !model)}
+                  disabled={(!text.trim() && (image || !jointes.files.length)) || (!image && !model)}
                   onClick={() => void start(text)}
                 />
               </div>
