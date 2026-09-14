@@ -4,9 +4,9 @@ import { Check, Copy, Download, Image as ImageIcon, RefreshCw, Square, Trash2, T
 import type { Message as Msg } from '../../lib/types'
 import { useImageURL } from '../../lib/hooks'
 import { cn, formatBytes, formatMs, shortTime } from '../../lib/utils'
-import { estimatedDuration, jobCaption, type Job } from '../../store/images'
+import { jobCaption, type Job } from '../../store/images'
 import { Button, MorphButton, ShakeButton, SpinButton, Tooltip } from '../ui/primitives'
-import { GridReveal } from './GridReveal'
+import { ShaderReveal } from './ShaderReveal'
 
 const ENTER = {
   initial: { opacity: 0, y: 8 },
@@ -16,6 +16,15 @@ const ENTER = {
 
 /** Au-delà, une image occuperait toute la colonne au détriment du fil. */
 const MAX_WIDTH = 520
+/** Borne de hauteur : un carré tiré à 520 px écrasait tout ce qui l'entoure,
+    alors qu'un 16:9 à la même largeur reste sage. */
+const MAX_HEIGHT = 360
+
+/** Largeur d'affichage, bornée dans les deux sens par le format demandé. */
+function frameWidth(aspect: number): number {
+  const ratio = Number.isFinite(aspect) && aspect > 0 ? aspect : 1
+  return Math.round(Math.min(MAX_WIDTH, MAX_HEIGHT * ratio))
+}
 
 function Header({ name, at }: { name: string; at: number }) {
   return (
@@ -48,16 +57,12 @@ export function GeneratingImage({ job, onCancel, onRevealed }: { job: Job; onCan
   return (
     <motion.div {...ENTER} className="group/msg max-w-[94%]">
       <Header name={job.modelName} at={job.startedAt} />
-      <div style={{ maxWidth: MAX_WIDTH }}>
-        <GridReveal
+      <div style={{ maxWidth: frameWidth(aspect) }}>
+        <ShaderReveal
           src={job.src ?? null}
           alt={job.prompt}
           aspect={aspect}
           caption={jobCaption(job)}
-          /* Pendant le chargement du modèle il n'y a rien à compter : la
-             mosaïque avance alors à son propre rythme, sur l'estimation. */
-          progress={job.phase === 'diffusing' && job.steps > 0 ? job.step / job.steps : undefined}
-          estimatedDuration={estimatedDuration(job)}
           onRevealComplete={onRevealed}
         />
       </div>
@@ -133,7 +138,7 @@ export const ImageMessage = memo(function ImageMessage({
     <motion.div {...ENTER} className={cn('group/msg max-w-[94%]', faded && 'opacity-55')}>
       <Header name={meta.modelName} at={message.createdAt} />
 
-      <div style={{ maxWidth: MAX_WIDTH }}>
+      <div style={{ maxWidth: frameWidth(meta.width / meta.height) }}>
         {url ? (
           <img
             src={url}

@@ -51,7 +51,7 @@ Fermer la fenêtre du lanceur arrête le serveur et Ollama.
 | **Téléchargements** | Menés par le serveur : rafraîchir la page, changer d'écran ou fermer l'onglet n'interrompt rien, la progression se retrouve au retour. |
 | **Modèles** | Recherche Hugging Face (GGUF) et bibliothèque Ollama, qui propose le plus capable de chaque famille que la carte peut porter. Téléchargement avec débit et temps restant, annulable. Chaque quantisation dit si elle tient. |
 | **Pièces jointes** | Images déposées, collées ou choisies, lues par les modèles `vision`. Badge cliquable sous le message. |
-| **Images** | Génération locale, dans le fil de conversation. Moteur et modèles selon la machine. |
+| **Images** | Génération locale, dans le fil de conversation. Moteur et modèles selon la machine. Mosaïque WebGL pendant le calcul, qui se dissout vers l'image. |
 | **Chiffrement** | Conversations verrouillables, AES-GCM au repos. |
 | **Mesures** | Entropie par jeton, perplexité, confiance, débit, latence, contexte. |
 | **Mémoire** | Au-delà de 72 % du contexte, les vieux échanges sont fondus dans un mémo Markdown modifiable. |
