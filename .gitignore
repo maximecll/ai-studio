@@ -12,6 +12,10 @@ dist/
 # depuis « Modèles » (≈ 2 Go de dépendances MLX).
 .venv-images/
 
+# Node.js récupéré par le lanceur quand la machine n'en a pas.
+# Se retélécharge tout seul ; ne doit jamais partir dans le dépôt.
+.runtime/
+
 # Réglages locaux d'éditeur
 .vscode/
 .idea/
