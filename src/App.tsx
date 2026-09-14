@@ -8,6 +8,8 @@ import { useUI } from './store/ui'
 import { useModels } from './store/models'
 import { useChat } from './store/chat'
 import { useVault } from './store/vault'
+import { useDownloads } from './store/downloads'
+import { useImages } from './store/images'
 import { PanelLeft } from 'lucide-react'
 import { Sidebar } from './components/layout/Sidebar'
 import { Button, Tooltip } from './components/ui/primitives'
@@ -76,6 +78,13 @@ export function App() {
     timer = window.setTimeout(() => void tick(), 15_000)
     return () => { vivant = false; clearTimeout(timer) }
   }, [refresh])
+
+  /* Installations et téléchargements vivent côté serveur : au chargement, on
+     se rebranche sur ceux qui tournent encore. */
+  useEffect(() => {
+    void useDownloads.getState().resume()
+    void useImages.getState().resume()
+  }, [])
 
   useEffect(() => {
     if (models.length) void bootstrap(models[0].name)

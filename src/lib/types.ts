@@ -285,6 +285,8 @@ export interface ImageEngine {
   /** Cache de morceaux Xet : un second espace disque, indépendant des poids. */
   xet?: number
   venv: string
+  /** Environnement présent mais inutilisable : installation coupée. */
+  partial?: boolean
   error?: string
   catalog: ImageModel[]
 }

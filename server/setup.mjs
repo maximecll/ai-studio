@@ -9,6 +9,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { get } from 'node:https'
 import { get as getHttp } from 'node:http'
+import { attach, start } from './tasks.mjs'
 
 const run = promisify(execFile)
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -429,18 +430,13 @@ async function installGitLinux(send) {
 }
 
 async function installGit(res) {
-  res.writeHead(200, {
-    'Content-Type': 'application/x-ndjson; charset=utf-8',
-    'Cache-Control': 'no-cache',
-    'X-Accel-Buffering': 'no',
-  })
-  const send = (e) => { if (!res.writableEnded) res.write(JSON.stringify(e) + '\n') }
+  const job = start('git', 'git', 'git', (send) => installGitRunner(send))
+  return attach(job, res)
+}
 
+async function installGitRunner(send) {
   try {
-    if ((await gitState()).ok) {
-      send({ type: 'done', already: true })
-      return res.end()
-    }
+    if ((await gitState()).ok) return send({ type: 'done', already: true })
     if (platform() === 'win32') await installGitWindows(send)
     else if (platform() === 'darwin') await installGitDarwin(send)
     else await installGitLinux(send)
@@ -450,20 +446,16 @@ async function installGit(res) {
   } catch (e) {
     send({ type: 'error', message: e.message })
   }
-  res.end()
 }
 
 async function install(res) {
   const a = asset()
   if (!a) return json(res, 400, { error: `Système non pris en charge : ${platform()} ${arch()}.` })
+  const job = start('ollama', 'ollama', 'Ollama', (send) => installOllamaRunner(a, send))
+  return attach(job, res)
+}
 
-  res.writeHead(200, {
-    'Content-Type': 'application/x-ndjson; charset=utf-8',
-    'Cache-Control': 'no-cache',
-    'X-Accel-Buffering': 'no',
-  })
-  const send = (e) => { if (!res.writableEnded) res.write(JSON.stringify(e) + '\n') }
-
+async function installOllamaRunner(a, send) {
   try {
     let bin = localBinary()
     if (!bin) {
@@ -503,5 +495,4 @@ async function install(res) {
   } catch (e) {
     send({ type: 'error', message: e.message })
   }
-  res.end()
 }
