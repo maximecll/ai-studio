@@ -2,7 +2,7 @@
 import { readdir, readFile, stat, unlink } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join, resolve, sep } from 'node:path'
 
 const ROOT = process.env.OLLAMA_MODELS ?? join(homedir(), '.ollama', 'models')
 const BLOBS = join(ROOT, 'blobs')
@@ -112,7 +112,7 @@ export async function purge() {
     if (entry.fresh) continue // transfert probablement en cours
     const full = resolve(BLOBS, entry.name)
     // Ceinture et bretelles : jamais en dehors du dossier des blobs.
-    if (!full.startsWith(resolve(BLOBS) + '/')) continue
+    if (!full.startsWith(resolve(BLOBS) + sep)) continue
     try {
       await unlink(full)
       removed.push(entry.name)
