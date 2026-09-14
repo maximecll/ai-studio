@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Cpu, Download, Loader2, TriangleAlert } from 'lucide-react'
+import { Cpu, Download, Loader2, Play, TriangleAlert } from 'lucide-react'
 import { installOllama, setupStatus, type SetupStatus } from '../../lib/setup'
 import { cn, formatBytes, formatEta, formatRate } from '../../lib/utils'
 import { useModels } from '../../store/models'
@@ -60,11 +60,13 @@ export function OllamaSetup({ onReady }: { onReady?: () => void }) {
       <div className="flex items-start gap-3">
         <Cpu className="mt-0.5 size-4 shrink-0 text-caution" />
         <div className="min-w-0 flex-1">
-          <h2 className="t-ui font-bold text-fg">Ollama n’est pas démarré</h2>
+          <h2 className="t-ui font-bold text-fg">
+            {status.ollamaInstalled ? 'Ollama n’est pas démarré' : 'Ollama n’est pas installé'}
+          </h2>
           <p className="t-meta mt-1.5 text-fg-muted">
-            C’est le moteur qui fait tourner vos modèles de langage. AI Studio peut l’installer pour
-            vous : une archive portable est déposée dans le dossier du projet, sans droit
-            administrateur et sans rien modifier ailleurs sur la machine.
+            {status.ollamaInstalled
+              ? 'C’est le moteur qui fait tourner vos modèles de langage. Il est déjà installé sur cette machine : il suffit de le démarrer.'
+              : 'C’est le moteur qui fait tourner vos modèles de langage. AI Studio peut l’installer pour vous : une archive portable est déposée dans le dossier du projet, sans droit administrateur et sans rien modifier ailleurs sur la machine.'}
           </p>
           {status.gpu && (
             <p className="t-caption mt-2 text-fg-subtle">
@@ -109,8 +111,10 @@ export function OllamaSetup({ onReady }: { onReady?: () => void }) {
         </div>
       ) : (
         <Button variant="primary" size="sm" className="mt-5" onClick={() => void installer()}>
-          <Download className="size-4" />
-          {status.ollamaLocal ? 'Démarrer Ollama' : `Installer Ollama (${status.asset?.includes('windows') || status.asset?.includes('linux') ? '≈ 1,5 Go' : '≈ 160 Mo'})`}
+          {status.ollamaInstalled ? <Play className="size-4" /> : <Download className="size-4" />}
+          {status.ollamaInstalled
+            ? 'Démarrer Ollama'
+            : `Installer Ollama (${status.asset?.includes('windows') || status.asset?.includes('linux') ? '≈ 1,5 Go' : '≈ 160 Mo'})`}
         </Button>
       )}
     </section>

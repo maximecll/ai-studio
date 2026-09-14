@@ -15,7 +15,10 @@ export interface SetupStatus {
   supported: boolean
   asset: string | null
   ollamaRunning: boolean
-  ollamaLocal: boolean
+  /** Trouvé quelque part sur la machine : archive portable, PATH, ou
+      emplacement d'installation officiel. */
+  ollamaInstalled: boolean
+  ollamaSource: 'runtime' | 'path' | 'system' | null
   totalRam: number
   gpu: GpuInfo | null
 }
