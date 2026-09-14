@@ -135,6 +135,58 @@ async function linuxInstaller() {
 /* ── Matériel ─────────────────────────────────────────────────────── */
 
 /** Puce graphique et mémoire qui lui est réellement accessible. */
+/** nvidia-smi donne la valeur exacte, sur Windows comme sur Linux. */
+async function nvidia() {
+  const { stdout } = await run(
+    'nvidia-smi',
+    ['--query-gpu=name,memory.total', '--format=csv,noheader,nounits'],
+    { timeout: 15000 },
+  )
+  const [name, mib] = stdout.trim().split('\n')[0].split(',').map((t) => t.trim())
+  const vram = Number(mib) * 1048576
+  if (!name || !vram) throw new Error('nvidia-smi muet')
+  return { name, unified: false, vram, source: 'nvidia-smi' }
+}
+
+/**
+ * VRAM sous Windows, lue dans le registre.
+ *
+ * `Win32_VideoController.AdapterRAM` est un entier 32 bits : au-delà de 4 Gio
+ * il sature, et une carte de 8 Go se déclare à 4. Le pilote publie la vraie
+ * taille dans `HardwareInformation.qwMemorySize`, sur 64 bits.
+ */
+async function windowsRegistry() {
+  const script = [
+    "$c='HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}';",
+    'Get-ChildItem $c -ErrorAction SilentlyContinue | ForEach-Object {',
+    '  $p = Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue;',
+    "  $m = $p.'HardwareInformation.qwMemorySize';",
+    "  if (-not $m) { $m = $p.'HardwareInformation.MemorySize' };",
+    '  if ($m -is [byte[]]) { $b = New-Object byte[] 8; [Array]::Copy($m, $b, [Math]::Min(8, $m.Length)); $m = [BitConverter]::ToUInt64($b, 0) };',
+    '  if ($m) { [PSCustomObject]@{ Name = $p.DriverDesc; Vram = [uint64]$m } }',
+    '} | Sort-Object Vram -Descending | Select-Object -First 1 | ConvertTo-Json -Compress',
+  ].join(' ')
+
+  const { stdout } = await run('powershell', ['-NoProfile', '-Command', script], { timeout: 25000 })
+  const carte = JSON.parse(stdout.trim() || 'null')
+  if (!carte?.Vram) throw new Error('Registre muet')
+  return { name: carte.Name ?? 'GPU inconnu', unified: false, vram: Number(carte.Vram), source: 'registre' }
+}
+
+/** Cartes AMD et Intel sous Linux : le noyau publie la taille dans sysfs. */
+async function linuxSysfs() {
+  const { stdout } = await run(
+    'sh',
+    ['-c', 'cat /sys/class/drm/card*/device/mem_info_vram_total 2>/dev/null | sort -n | tail -1'],
+    { timeout: 10000 },
+  )
+  const octets = Number(stdout.trim())
+  if (!octets) throw new Error('sysfs muet')
+  const { stdout: nom } = await run('sh', ['-c', "lspci | grep -i 'vga\\|3d' | head -1"], { timeout: 15000 })
+    .catch(() => ({ stdout: '' }))
+  return { name: nom.split(':').pop()?.trim() || 'GPU inconnu', unified: false, vram: octets, source: 'sysfs' }
+}
+
 async function gpu() {
   try {
     if (platform() === 'darwin') {
@@ -146,22 +198,29 @@ async function gpu() {
       return { name, cores, unified: true, vram: Math.round(totalmem() * 0.75), source: 'system_profiler' }
     }
     if (platform() === 'win32') {
+      for (const sonde of [nvidia, windowsRegistry]) {
+        try { return await sonde() } catch { /* source suivante */ }
+      }
+      // Dernier recours : AdapterRAM, en écartant sa valeur saturée.
       const { stdout } = await run('powershell', ['-NoProfile', '-Command',
         'Get-CimInstance Win32_VideoController | Select-Object Name,AdapterRAM | ConvertTo-Json -Compress'],
         { timeout: 20000 })
       const list = [].concat(JSON.parse(stdout))
       const best = list.sort((x, y) => (y.AdapterRAM ?? 0) - (x.AdapterRAM ?? 0))[0] ?? {}
-      return { name: best.Name ?? 'GPU inconnu', unified: false, vram: best.AdapterRAM ?? 0, source: 'Win32_VideoController' }
+      const sature = best.AdapterRAM >= 4294967295
+      return {
+        name: best.Name ?? 'GPU inconnu',
+        unified: false,
+        vram: sature ? 0 : (best.AdapterRAM ?? 0),
+        source: 'Win32_VideoController',
+      }
     }
-    // Linux : nvidia-smi donne la VRAM exacte, sinon on se contente du nom.
-    try {
-      const { stdout } = await run('nvidia-smi', ['--query-gpu=name,memory.total', '--format=csv,noheader,nounits'], { timeout: 15000 })
-      const [name, mib] = stdout.trim().split('\n')[0].split(',').map((s) => s.trim())
-      return { name, unified: false, vram: Number(mib) * 1048576, source: 'nvidia-smi' }
-    } catch {
-      const { stdout } = await run('sh', ['-c', "lspci | grep -i 'vga\\|3d' | head -1"], { timeout: 15000 })
-      return { name: stdout.split(':').pop()?.trim() || 'GPU inconnu', unified: false, vram: 0, source: 'lspci' }
+
+    for (const sonde of [nvidia, linuxSysfs]) {
+      try { return await sonde() } catch { /* source suivante */ }
     }
+    const { stdout } = await run('sh', ['-c', "lspci | grep -i 'vga\\|3d' | head -1"], { timeout: 15000 })
+    return { name: stdout.split(':').pop()?.trim() || 'GPU inconnu', unified: false, vram: 0, source: 'lspci' }
   } catch {
     return null
   }

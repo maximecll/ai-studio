@@ -207,6 +207,7 @@ function ModelCard({ model, loaded }: { model: OllamaModel; loaded?: OllamaModel
 export function ModelsView() {
   const { models, running, status, version, refresh } = useModels()
   const [spinning, setSpinning] = useState(false)
+  const hardware = useHardware()
 
   useEffect(() => { void refresh() }, [refresh])
 
@@ -223,6 +224,10 @@ export function ModelsView() {
         <>
           {models.length} installé{models.length > 1 ? 's' : ''} · {formatBytes(totalSize)}
           {vram > 0 && ` · ${formatBytes(vram)} en mémoire`}
+          {/* La carte détectée est affichée : c'est elle qui décide des verdicts. */}
+          {hardware?.gpu && (
+            ` · ${hardware.gpu.name}${hardware.gpu.vram > 0 ? ` ${formatBytes(hardware.gpu.vram)}` : ''}`
+          )}
         </>
       }
       width="max-w-6xl"
