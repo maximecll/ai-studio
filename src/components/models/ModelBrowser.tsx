@@ -8,18 +8,7 @@ import { useDownloads } from '../../store/downloads'
 import { useModels } from '../../store/models'
 import { Badge, Input, Tooltip } from '../ui/primitives'
 import { BORDURE, COURT, gpuVerdict, PASTILLE, useHardware } from '../../lib/hardware'
-
-/** Modèles de la bibliothèque Ollama, tirables par leur seul nom. */
-const LIBRARY = [
-  { name: 'llama3.2:3b', note: 'léger et rapide' },
-  { name: 'qwen2.5:7b', note: 'très polyvalent' },
-  { name: 'qwen2.5-coder:7b', note: 'spécial code' },
-  { name: 'mistral:7b', note: 'solide en français' },
-  { name: 'gemma2:9b', note: 'qualité Google' },
-  { name: 'phi4:14b', note: 'raisonnement' },
-  { name: 'deepseek-r1:7b', note: 'réflexion' },
-  { name: 'nomic-embed-text', note: 'vecteurs' },
-]
+import { ALL_LIBRARY, recommended, type Suggestion } from '../../lib/library'
 
 /** Quantisations dépliées d'un dépôt, avec leur poids réel. */
 function Quants({ repo }: { repo: string }) {
@@ -164,9 +153,17 @@ export function ModelBrowser() {
     return () => { clearTimeout(t); c.abort() }
   }, [query])
 
+  const materiel = useHardware()
   const direct = hf.normalize(query)
   const looksLikeReference = /\//.test(query.trim())
-  const library = LIBRARY.filter((m) => !query.trim() || m.name.includes(query.trim().toLowerCase()))
+  /* Sans recherche, on propose ce que la carte porte. Avec une recherche, on
+     retombe sur la bibliothèque entière : l'utilisateur sait ce qu'il veut. */
+  const cherche = query.trim().toLowerCase()
+  const library: Suggestion[] = cherche
+    ? ALL_LIBRARY.filter((m) => m.name.includes(cherche)).map((m) => ({ ...m, level: 'ok' as const }))
+    : materiel
+      ? recommended(materiel.gpu, materiel.totalRam)
+      : []
 
   return (
     <section className="rounded-lg bg-surface shadow-card">
@@ -212,23 +209,38 @@ export function ModelBrowser() {
 
         {library.length > 0 && (
           <div className="mt-4">
-            <h3 className="t-label mb-2.5 text-fg-subtle">Bibliothèque Ollama</h3>
+            <h3 className="t-label mb-2.5 text-fg-subtle">
+              {cherche ? 'Bibliothèque Ollama' : 'Recommandés pour votre machine'}
+            </h3>
             <div className="flex flex-wrap gap-2">
               {library.map((m) => (
                 <button
                   key={m.name}
                   onClick={() => void start(m.name)}
                   className={cn(
-                    'group flex h-9 cursor-pointer items-center gap-2 rounded-full border border-line bg-surface px-3.5',
-                    'text-[13px] transition-colors duration-150 hover:border-line-strong hover:bg-fg/[0.04]',
+                    'group flex h-9 cursor-pointer items-center gap-2 rounded-full border bg-surface px-3.5',
+                    'text-[13px] transition-colors duration-150 hover:bg-fg/[0.04]',
+                    m.level === 'ok' ? 'border-line hover:border-line-strong' : BORDURE[m.level],
                   )}
                 >
                   <Download className="size-3.5 text-fg-subtle group-hover:text-fg" />
                   <span className="font-medium text-fg">{m.name}</span>
                   <span className="text-fg-subtle">{m.note}</span>
+                  <span className="font-mono text-[12px] text-fg-subtle">{formatBytes(m.bytes)}</span>
+                  {m.level !== 'ok' && (
+                    <span className="flex items-center gap-1.5 border-l border-line pl-2.5 text-fg-muted">
+                      <span className={cn('size-1.5 shrink-0 rounded-full', PASTILLE[m.level])} />
+                      {COURT[m.level]}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
+            {!cherche && materiel?.gpu && (
+              <p className="t-caption mt-2.5 text-fg-subtle">
+                Le plus capable de chaque famille qui tient sur {materiel.gpu.name}. Cherchez un nom pour voir toute la bibliothèque.
+              </p>
+            )}
           </div>
         )}
       </div>

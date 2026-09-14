@@ -48,7 +48,7 @@ Fermer la fenêtre du lanceur arrête le serveur et Ollama.
 | **Conversations** | Renommage, épinglage, duplication, recherche plein texte, import/export Markdown et JSON. Titres générés par le modèle. |
 | **Inférence** | Température, top-p/k, min-p, pénalités, contexte, graine, mirostat, mode réflexion — par conversation. |
 | **Presets** | Instructions système et paramètres enregistrés, applicables en un clic. |
-| **Modèles** | Recherche Hugging Face (GGUF) et bibliothèque Ollama. Téléchargement avec débit et temps restant, annulable. Chaque quantisation dit si elle tient sur la carte graphique. |
+| **Modèles** | Recherche Hugging Face (GGUF) et bibliothèque Ollama, qui propose le plus capable de chaque famille que la carte peut porter. Téléchargement avec débit et temps restant, annulable. Chaque quantisation dit si elle tient. |
 | **Pièces jointes** | Images déposées, collées ou choisies, lues par les modèles `vision`. Badge cliquable sous le message. |
 | **Images** | Génération locale, dans le fil de conversation. Moteur et modèles selon la machine. |
 | **Chiffrement** | Conversations verrouillables, AES-GCM au repos. |
@@ -64,6 +64,8 @@ Sur la page **Modèles**, chaque modèle de langage porte un verdict — les mod
 | 🟢 Supporté | Tient entièrement sur la carte graphique — vitesse maximale |
 | 🟠 Supporté à moitié | Dépasse le GPU mais tient en mémoire vive : une partie des couches tourne sur le processeur |
 | 🔴 Non supporté | Dépasse la mémoire de la machine — relecture depuis le disque à chaque jeton |
+
+La bibliothèque Ollama s'aligne sur le même calcul : elle propose, par famille — polyvalent, code, raisonnement, images, vecteurs — le modèle le plus capable qui tient entièrement sur la carte. Une recherche par nom redonne la bibliothèque complète.
 
 Les modèles de génération d'images, eux, ne sont proposés que sur les systèmes où leur moteur tourne : Windows et Linux partagent les mêmes.
 
