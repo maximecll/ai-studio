@@ -81,9 +81,13 @@ if not exist "dist\index.html" (
 )
 
 rem ---- 4 ---- Serveur --------------------------------------------------
+rem  On retient le PID : a la fermeture, on n'arrete que ce serveur-la et
+rem  non tous les node.exe de la machine.
 echo.
 echo   [ Demarrage du serveur ]
-start "" /b node server.mjs
+set "SRVPID="
+for /f "delims=" %%p in ('powershell -NoProfile -Command "(Start-Process node -ArgumentList 'server.mjs' -PassThru -WindowStyle Hidden).Id" 2^>nul') do set "SRVPID=%%p"
+if not defined SRVPID start "" /b node server.mjs
 
 rem  Attendre que le port reponde avant d'ouvrir le navigateur.
 set "PRET="
@@ -106,7 +110,11 @@ echo.
 echo   Fermez cette fenetre pour arreter AI Studio.
 echo.
 pause >nul
-taskkill /f /im node.exe >nul 2>&1
+if defined SRVPID (
+  taskkill /f /t /pid %SRVPID% >nul 2>&1
+) else (
+  taskkill /f /im node.exe >nul 2>&1
+)
 exit /b 0
 
 rem ---- Erreurs ---------------------------------------------------------
