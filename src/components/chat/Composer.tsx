@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import { Brain, Check, ChevronDown, Circle, Image as ImageIcon, Paperclip, Send, Square } from 'lucide-react'
+import { Brain, Check, ChevronDown, Circle, Image as ImageIcon, Paperclip, Send, Square, TriangleAlert } from 'lucide-react'
 import { imageParamsOf, updateConversation } from '../../lib/db'
 import { usePresets } from '../../lib/hooks'
 import type { Conversation, ImageParams, Settings } from '../../lib/types'
 import { cn, estimateTokens, formatCompact, formatNumber, modKey } from '../../lib/utils'
-import { prettyModel } from '../../lib/ollama'
+import { hasCapability, prettyModel } from '../../lib/ollama'
 import { PresetGlyph } from '../../lib/preset-icons'
-import { useModels } from '../../store/models'
+import { findModel, useModels } from '../../store/models'
 import { useChat } from '../../store/chat'
 import { Button, Chip, Menu, MenuItem, MenuLabel, MenuSeparator, MorphButton, Tooltip } from '../ui/primitives'
+import { useAttachments } from '../../lib/attachments'
+import { PendingStrip } from './Attachments'
 import { href, navigate } from '../../lib/router'
 import { ImageControls, ModeToggle, useImageEngine } from './ImageControls'
 
@@ -129,7 +131,7 @@ export function Composer({
   /** Jetons effectivement occupés, mémoire et flux en cours compris. */
   usedTokens: number
   hasMemory: boolean
-  onSend: (text: string) => void
+  onSend: (text: string, files: File[]) => void
   /** Envoi en mode image — la description part vers le moteur de diffusion. */
   onGenerate: (prompt: string, params: ImageParams) => void
   generating: boolean
@@ -137,6 +139,9 @@ export function Composer({
 }) {
   const [text, setText] = useState('')
   const ref = useRef<HTMLTextAreaElement>(null)
+  const fichierRef = useRef<HTMLInputElement>(null)
+  const jointes = useAttachments()
+  const [survol, setSurvol] = useState(false)
   const [mode, setMode] = useComposerMode(conversation.id)
   const { engine } = useImageEngine()
   const hasImageModel = (engine?.catalog ?? []).some((m) => m.installed)
@@ -146,6 +151,12 @@ export function Composer({
   /* Les réglages de diffusion appartiennent à la conversation, comme ceux du
      modèle de langage : changer de format ici ne doit rien changer ailleurs. */
   const imageParams = imageParamsOf(conversation, settings)
+
+  /* Sans la capacité « vision », le modèle reçoit les images et les ignore
+     en silence : mieux vaut le dire avant l'envoi. */
+  const catalogue = useModels((s) => s.models)
+  const aveugle = !!jointes.items.length
+    && !hasCapability(findModel(catalogue, conversation.model ?? ''), 'vision')
 
   useEffect(() => {
     setText(sessionStorage.getItem(`draft.${conversation.id}`) ?? '')
@@ -159,10 +170,25 @@ export function Composer({
 
   const submit = () => {
     const t = text.trim()
-    if (!t || busy) return
+    if (busy) return
+    if (image) {
+      if (!t) return
+      setText('')
+      return onGenerate(t, imageParams)
+    }
+    if (!t && !jointes.files.length) return
     setText('')
-    if (image) onGenerate(t, imageParams)
-    else onSend(t)
+    onSend(t, jointes.files)
+    jointes.clear()
+  }
+
+  /* Une capture d'écran collée arrive dans `files` : autant la joindre. */
+  const onPaste = (e: React.ClipboardEvent) => {
+    if (image) return
+    const fichiers = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'))
+    if (!fichiers.length) return
+    e.preventDefault()
+    void jointes.add(fichiers)
   }
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -183,15 +209,32 @@ export function Composer({
     <div className="px-6 pt-2 pb-6">
       <div className="mx-auto w-full max-w-[860px]">
         <div
+          onDragOver={(e) => { if (!image) { e.preventDefault(); setSurvol(true) } }}
+          onDragLeave={() => setSurvol(false)}
+          onDrop={(e) => {
+            if (image) return
+            e.preventDefault()
+            setSurvol(false)
+            void jointes.add(e.dataTransfer.files)
+          }}
           className={cn(
             'rounded-lg bg-surface transition-shadow duration-200',
             'shadow-card focus-within:shadow-float',
+            survol && 'ring-2 ring-accent',
           )}
         >
+          <PendingStrip items={jointes.items} onRemove={jointes.remove} />
+          {aveugle && (
+            <p className="t-caption flex items-start gap-2 px-5 pt-2 text-caution">
+              <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+              {prettyModel(conversation.model ?? '')} ne lit pas les images — choisissez un modèle « vision ».
+            </p>
+          )}
           <textarea
             ref={ref}
             value={text}
             onChange={(e) => setText(e.target.value)}
+            onPaste={onPaste}
             onKeyDown={onKeyDown}
             rows={1}
             placeholder={
@@ -237,9 +280,21 @@ export function Composer({
 
             <div className="flex shrink-0 items-center gap-2">
               {!image && (
-                <Tooltip label="Les pièces jointes arrivent bientôt" side="top">
-                  <Button size="icon-sm" disabled className="hidden sm:inline-flex"><Paperclip className="size-4" /></Button>
-                </Tooltip>
+                <>
+                  <input
+                    ref={fichierRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    hidden
+                    onChange={(e) => { void jointes.add(e.target.files); e.target.value = '' }}
+                  />
+                  <Tooltip label="Joindre une image — ou la déposer ici, ou la coller" side="top">
+                    <Button size="icon-sm" onClick={() => fichierRef.current?.click()}>
+                      <Paperclip className="size-4" />
+                    </Button>
+                  </Tooltip>
+                </>
               )}
 
               {!image && <Tooltip
@@ -272,7 +327,7 @@ export function Composer({
                       ? 'Produire l’image'
                       : settings.sendOnEnter ? 'Envoyer (Entrée)' : `Envoyer (${modKey}+Entrée)`
                   }
-                  disabled={!text.trim()} onClick={submit}
+                  disabled={!text.trim() && (image || !jointes.files.length)} onClick={submit}
                 />
               )}
             </div>

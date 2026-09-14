@@ -56,13 +56,13 @@ export function ChatView({ conv }: { conv: Conversation }) {
   const shown = showFolded ? messages : live
 
   // Recoller une réponse déjà présente pousse le modèle à la reproduire au lieu de l'exécuter — mesuré, et insensible à toute consigne.
-  const [echoWarning, setEchoWarning] = useState<string | null>(null)
+  const [echoWarning, setEchoWarning] = useState<{ text: string; files: File[] } | null>(null)
 
   const onSend = useCallback(
-    (text: string) => {
+    (text: string, files: File[] = []) => {
       const duplicate = messages.some((m) => m.role === 'assistant' && !m.error && resembles(text, m.content))
-      if (duplicate) { setEchoWarning(text); return }
-      void send(conv.id, text)
+      if (duplicate) { setEchoWarning({ text, files }); return }
+      void send(conv.id, text, files)
     },
     [conv.id, send, messages],
   )
@@ -90,9 +90,13 @@ export function ChatView({ conv }: { conv: Conversation }) {
   )
 
   /** Supprimer un message porteur d'image emporte aussi ses octets. */
-  const dropMessage = useCallback(async (id: string, blobId?: string) => {
+  /** Supprimer un message emporte ses octets : image produite et pièces jointes. */
+  const dropMessage = useCallback(async (id: string) => {
+    const msg = await db.messages.get(id)
     await db.messages.delete(id)
-    if (blobId) await deleteImage(blobId)
+    for (const blobId of [msg?.image?.blobId, ...(msg?.attachments ?? []).map((a) => a.blobId)]) {
+      if (blobId) await deleteImage(blobId)
+    }
   }, [])
 
   const restart = useCallback(
@@ -149,7 +153,7 @@ export function ChatView({ conv }: { conv: Conversation }) {
                 canRegenerate={!busy}
                 disabled={busy}
                 onRegenerate={() => regenerateImage(m.image!)}
-                onDelete={() => void dropMessage(m.id, m.image?.blobId)}
+                onDelete={() => void dropMessage(m.id)}
               />
             ) : (
               <AssistantMessage
@@ -228,13 +232,13 @@ export function ChatView({ conv }: { conv: Conversation }) {
             <>
               <Button
                 variant="soft" size="sm"
-                onClick={() => { const t = echoWarning!; setEchoWarning(null); void send(conv.id, t) }}
+                onClick={() => { const e = echoWarning!; setEchoWarning(null); void send(conv.id, e.text, e.files) }}
               >
                 Envoyer ici quand même
               </Button>
               <Button
                 variant="primary" size="sm"
-                onClick={() => { const t = echoWarning!; setEchoWarning(null); void restart(t) }}
+                onClick={() => { const e = echoWarning!; setEchoWarning(null); void restart(e.text) }}
               >
                 Rejouer à part
               </Button>

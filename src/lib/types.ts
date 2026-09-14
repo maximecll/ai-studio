@@ -116,6 +116,8 @@ export interface Message {
   image?: ImageMeta
   /** Réglages avec lesquels ce message a été envoyé au moteur de diffusion. */
   imageRequest?: ImageParams
+  /** Images jointes à la question, transmises au modèle. */
+  attachments?: Attachment[]
   /** Raisonnement séparé, pour les modèles « thinking ». */
   thinking?: string
   createdAt: number
@@ -124,6 +126,15 @@ export interface Message {
   error?: string
   /** Replié dans la mémoire : conservé et lisible, mais plus transmis au modèle. */
   folded?: 0 | 1
+}
+
+/** Image jointe par l'utilisateur, lue par le modèle s'il a la vision. */
+export interface Attachment {
+  /** Clé de la ligne portant les octets, dans la table `images`. */
+  blobId: string
+  name: string
+  type: string
+  size: number
 }
 
 /** Octets d'une image, rangés à part des messages. */

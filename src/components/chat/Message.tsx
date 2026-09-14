@@ -9,6 +9,7 @@ import { cn, formatMs, formatNumber, formatNs, shortTime, tokensPerSecond } from
 import { entropyBand } from '../../lib/entropy'
 import { prettyModel } from '../../lib/ollama'
 import { Button, MorphButton, ShakeButton, SpinButton, Tooltip } from '../ui/primitives'
+import { AttachmentBadges } from './Attachments'
 import { Markdown } from './Markdown'
 
 const ENTER = {
@@ -227,9 +228,16 @@ export const UserMessage = memo(function UserMessage({
 
   return (
     <motion.div {...ENTER} className={cn('group/msg flex flex-col items-end gap-1', faded && 'opacity-55')}>
-      <div className="max-w-[86%] rounded-lg rounded-br-sm bg-surface-2 px-4 py-3">
-        <p className="t-body whitespace-pre-wrap text-fg">{message.content}</p>
-      </div>
+      {message.content && (
+        <div className="max-w-[86%] rounded-lg rounded-br-sm bg-surface-2 px-4 py-3">
+          <p className="t-body whitespace-pre-wrap text-fg">{message.content}</p>
+        </div>
+      )}
+      {!!message.attachments?.length && (
+        <div className="max-w-[86%]">
+          <AttachmentBadges attachments={message.attachments} />
+        </div>
+      )}
       <div className="flex h-7 items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover/msg:opacity-100 focus-within:opacity-100">
         <span className="t-caption mr-1 text-fg-subtle">{shortTime(message.createdAt)}</span>
         <MorphButton idle={Copy} hover={Check} size="icon-sm" title="Copier"

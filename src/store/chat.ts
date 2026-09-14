@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { ollama, OllamaError } from '../lib/ollama'
+import { imagesOf, storeAttachments } from '../lib/attachments'
 import {
   addMessage, db, deleteMessagesFrom, getSettings, messagesOf, updateConversation, updateMessage,
 } from '../lib/db'
@@ -36,7 +37,7 @@ interface ChatState {
   /** Conversations en cours de compactage. */
   compacting: Record<string, boolean>
   compact: (conversationId: string) => Promise<void>
-  send: (conversationId: string, text: string) => Promise<void>
+  send: (conversationId: string, text: string, files?: File[]) => Promise<void>
   regenerate: (conversationId: string) => Promise<void>
   editUserMessage: (conversationId: string, messageId: string, text: string) => Promise<void>
   stop: (conversationId: string) => void
@@ -178,7 +179,7 @@ export const useChat = create<ChatState>((set, get) => {
     const settings = await getSettings()
     const history = await messagesOf(conversationId)
 
-    const payload: Array<Pick<Message, 'role' | 'content'>> = []
+    const payload: Array<Pick<Message, 'role' | 'content'> & { images?: string[] }> = []
 
     const preamble = [
       conv.system.trim(),
@@ -188,7 +189,8 @@ export const useChat = create<ChatState>((set, get) => {
     for (const m of history) {
       // Les messages repliés vivent désormais dans la mémoire.
       if (m.role === 'system' || m.error || m.folded) continue
-      payload.push({ role: m.role, content: m.content })
+      const images = await imagesOf(m.attachments)
+      payload.push({ role: m.role, content: m.content, ...(images ? { images } : null) })
     }
     /* Reprise : on demande la suite sans persister cette consigne. */
     if (opts.continueFrom) payload.push({ role: 'user', content: CONTINUE_PROMPT })
@@ -370,10 +372,11 @@ export const useChat = create<ChatState>((set, get) => {
       await run(conversationId, { continueFrom: last.id })
     },
 
-    async send(conversationId, text) {
+    async send(conversationId, text, files = []) {
       const trimmed = text.trim()
-      if (!trimmed || get().streams[conversationId]) return
-      await addMessage({ conversationId, role: 'user', content: trimmed })
+      if ((!trimmed && !files.length) || get().streams[conversationId]) return
+      const attachments = files.length ? await storeAttachments(conversationId, files) : undefined
+      await addMessage({ conversationId, role: 'user', content: trimmed, ...(attachments ? { attachments } : null) })
       await run(conversationId)
     },
 
