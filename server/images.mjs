@@ -6,6 +6,7 @@ import { arch, homedir, platform, totalmem } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
+import { download } from './setup.mjs'
 import { promisify } from 'node:util'
 
 const execute = promisify(execFile)
@@ -19,6 +20,14 @@ const WORKER = join(ROOT, 'scripts', 'flux_worker.py')
 
 /** Environnement Python dédié : le moteur d'images n'a rien à faire ailleurs. */
 const VENV = process.env.STUDIO_IMAGES_VENV ?? join(ROOT, '.venv-images')
+
+/* Python embarqué, quand la machine n'en a pas. Les archives
+   `python-build-standalone` sont relogeables et se déplient sans installateur :
+   même principe que Node.js et Ollama. */
+const RUNTIME = join(ROOT, '.runtime')
+const PY_DIR = join(RUNTIME, 'python')
+const PY_TAG = '20260901'
+const PY_VERSION = '3.12.14'
 const PYTHON = platform() === 'win32'
   ? join(VENV, 'Scripts', 'python.exe')
   : join(VENV, 'bin', 'python')
@@ -582,8 +591,26 @@ const pulls = new Map()
 
 /* ── Installation du moteur ──────────────────────────────────────── */
 
-/** Interpréteur hôte : le nom de la commande varie d'un système à l'autre. */
+function pythonCible() {
+  const a = arch() === 'arm64' ? 'aarch64' : 'x86_64'
+  switch (platform()) {
+    case 'win32': return `${a}-pc-windows-msvc`
+    case 'darwin': return `${a}-apple-darwin`
+    case 'linux': return `${a}-unknown-linux-gnu`
+    default: return null
+  }
+}
+
+function pythonEmbarque() {
+  const p = platform() === 'win32' ? join(PY_DIR, 'python.exe') : join(PY_DIR, 'bin', 'python3')
+  return existsSync(p) ? p : null
+}
+
+/** Interpréteur hôte : celui qu'on a déposé d'abord, celui du système ensuite. */
 async function hostPython() {
+  const embarque = pythonEmbarque()
+  if (embarque) return { cmd: embarque, prefixe: [], version: PY_VERSION }
+
   const essais = platform() === 'win32'
     ? [['py', ['-3']], ['python', []], ['python3', []]]
     : [['python3', []], ['python', []]]
@@ -595,6 +622,42 @@ async function hostPython() {
     } catch { /* on essaie le suivant */ }
   }
   return null
+}
+
+/** Dépose un interpréteur complet dans `.runtime/python`, sans installateur
+    ni droit administrateur : c'est le seul moyen d'aller au bout sur une
+    machine qui n'a pas Python — le cas courant sous Windows. */
+async function installPython(send, log) {
+  const cible = pythonCible()
+  if (!cible) throw new Error(`Système non pris en charge pour Python : ${platform()} ${arch()}.`)
+
+  const nom = `cpython-${PY_VERSION}+${PY_TAG}-${cible}-install_only.tar.gz`
+  const url = `https://github.com/astral-sh/python-build-standalone/releases/download/${PY_TAG}/${nom}`
+  await mkdir(RUNTIME, { recursive: true })
+  const archive = join(RUNTIME, nom)
+
+  send({ type: 'phase', phase: 'install', label: `Téléchargement de Python ${PY_VERSION}` })
+  const t0 = Date.now()
+  await download(url, archive, (completed, total) => {
+    const speed = completed / Math.max(0.001, (Date.now() - t0) / 1000)
+    send({
+      type: 'progress',
+      phase: 'downloading',
+      completed,
+      total,
+      speed,
+      eta: speed > 1 && total ? (total - completed) / speed : null,
+    })
+  })
+
+  send({ type: 'phase', phase: 'install', label: 'Installation de Python' })
+  await rm(PY_DIR, { recursive: true, force: true })
+  // L'archive contient un dossier `python/` : on la déplie dans `.runtime`.
+  await execute('tar', ['-xzf', archive, '-C', RUNTIME], { timeout: 900000, maxBuffer: 8 << 20 })
+  await rm(archive, { force: true })
+
+  if (!pythonEmbarque()) throw new Error("L'archive Python ne contient pas l'interpréteur attendu.")
+  log(`Python ${PY_VERSION} déposé dans .runtime/python`)
 }
 
 /** Une carte NVIDIA change la roue PyTorch à installer — et tout le reste. */
@@ -633,13 +696,19 @@ function pipInstall(send) {
 
     ;(async () => {
       if (!existsSync(PYTHON)) {
-        const hote = await hostPython()
+        let hote = await hostPython()
         if (!hote) {
-          send({
-            type: 'error',
-            message: 'Python 3.10 ou plus récent est introuvable. Installez-le depuis python.org, puis relancez AI Studio.',
-          })
-          return done()
+          try {
+            await installPython(send, (line) => send({ type: 'log', line }))
+          } catch (e) {
+            send({ type: 'error', message: `Python n'a pas pu être installé : ${e.message}` })
+            return done()
+          }
+          hote = await hostPython()
+          if (!hote) {
+            send({ type: 'error', message: 'Python reste introuvable après installation.' })
+            return done()
+          }
         }
         const venv = await run(hote.cmd, [...hote.prefixe, '-m', 'venv', VENV], "Création de l'environnement Python")
         if (venv.code !== 0) {

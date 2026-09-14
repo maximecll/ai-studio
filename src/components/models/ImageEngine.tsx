@@ -201,7 +201,7 @@ function Install() {
               : 'mflux, le portage MLX de FLUX, qui tourne nativement sur la puce Apple'}
             . L’installation crée un environnement Python à part, dans le dossier de l’application —
             {engine?.backend === 'diffusers' ? ' 3 à 5 Go' : ' environ 2 Go'}, sans rien toucher au reste du système.
-            Python 3.10 ou plus récent doit être présent.
+            Python est déposé avec, si la machine n’en a pas.
           </p>
         </div>
       </div>

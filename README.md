@@ -111,7 +111,9 @@ Le serveur sort avec le code `75`, le lanceur le relance, la page se recharge. L
 
 ## Génération d'images
 
-Ollama ne fait pas de diffusion. Le moteur est installé depuis **Modèles → Génération d'images**, dans un environnement Python à part (`.venv-images`). Python 3.10 ou plus récent doit être présent sur la machine.
+Ollama ne fait pas de diffusion. Le moteur est installé depuis **Modèles → Génération d'images**, dans un environnement Python à part (`.venv-images`).
+
+**Aucun prérequis à poser soi-même.** Si la machine n'a pas de Python 3.10 ou plus récent, un interpréteur portable est déposé dans `.runtime/python` — comme Node.js, Ollama et git.
 
 ### 🍎 macOS Apple Silicon — mflux
 
