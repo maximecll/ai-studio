@@ -133,7 +133,7 @@ server.listen(PORT, HOST, () => {
   if (!secure && HOST !== '127.0.0.1' && HOST !== 'localhost') {
     console.warn(
       "Attention : sans HTTPS, les navigateurs désactivent WebCrypto hors localhost.\n" +
-      '           Le chiffrement des conversations sera indisponible. Voir deploy/RESEAU-LOCAL.md.',
+      '           Le chiffrement des conversations sera indisponible.',
     )
   }
 })
