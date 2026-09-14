@@ -1,11 +1,5 @@
 #!/usr/bin/env node
-/**
- * Serveur local d'AI Studio.
- * - sert le build statique de `dist/`
- * - relaie `/ollama/*` vers Ollama (évite toute configuration CORS)
- * - expose `/images/*`, la génération d'images par FLUX (cf. server/images.mjs)
- * Aucune dépendance : Node seul suffit.
- */
+/** Serveur local d'AI Studio. */
 import { createServer, request as httpRequest } from 'node:http'
 import { createServer as createSecureServer, request as httpsRequest } from 'node:https'
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
@@ -23,11 +17,7 @@ const PORT = Number(process.env.PORT ?? 5300)
 const HOST = process.env.HOST ?? '127.0.0.1'
 const OLLAMA = new URL(process.env.OLLAMA_HOST ?? 'http://127.0.0.1:11434')
 
-/**
- * HTTPS facultatif. Indispensable dès qu'on sort de localhost : les
- * navigateurs réservent WebCrypto — donc le chiffrement — aux contextes
- * sécurisés. Certificat local recommandé : `mkcert ai-studio.local`.
- */
+/** HTTPS facultatif. */
 const CERT = process.env.STUDIO_CERT
 const KEY = process.env.STUDIO_KEY
 

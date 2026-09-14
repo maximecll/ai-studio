@@ -1,15 +1,4 @@
-/**
- * Entretien du magasin de blobs d'Ollama.
- *
- * Deux catégories de déchets s'y accumulent :
- *   · les morceaux partiels (`…-partial`, `…-partial-0`) laissés par un
- *     téléchargement interrompu ;
- *   · les blobs orphelins, qu'aucun manifeste ne référence plus — typiquement
- *     après la suppression d'un modèle ou une mise à jour de tag.
- *
- * Ollama n'expose pas d'API pour ça : on lit le magasin directement.
- * La suppression est délibérément prudente (cf. `plan`).
- */
+/** Entretien du magasin de blobs d'Ollama. */
 import { readdir, readFile, stat, unlink } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -56,10 +45,7 @@ async function referencedDigests() {
   return { digests, manifestCount: files.length }
 }
 
-/**
- * Inventaire de ce qui peut être supprimé.
- * Renvoie `safe: false` si l'état ne permet pas de conclure sans risque.
- */
+/** Inventaire de ce qui peut être supprimé. */
 export async function plan() {
   if (!existsSync(BLOBS)) {
     return { safe: false, reason: "Magasin Ollama introuvable.", partials: [], orphans: [], inUse: 0 }

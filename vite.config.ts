@@ -5,12 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 /** Cible Ollama — surchargeable via OLLAMA_HOST au lancement. */
 const OLLAMA = process.env.OLLAMA_HOST ?? 'http://127.0.0.1:11434'
 
-/**
- * L'entretien du magasin Ollama et la génération d'images touchent au système
- * de fichiers : ils vivent côté serveur. Ce greffon monte les mêmes
- * gestionnaires qu'en production, pour que le comportement soit identique en
- * développement.
- */
+/** L'entretien du magasin Ollama et la génération d'images touchent au système de fichiers : ils vivent côté serveur. */
 function maintenance(): PluginOption {
   return {
     name: 'studio-maintenance',

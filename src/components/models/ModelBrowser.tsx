@@ -112,10 +112,7 @@ function Result({ model }: { model: HfModel }) {
   )
 }
 
-/**
- * Recherche unifiée : la bibliothèque Ollama et Hugging Face au même endroit.
- * Une référence collée telle quelle est aussi acceptée.
- */
+/** Recherche unifiée : la bibliothèque Ollama et Hugging Face au même endroit. */
 export function ModelBrowser() {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<HfModel[]>([])

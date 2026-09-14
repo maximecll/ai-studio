@@ -2,11 +2,7 @@ export function cn(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(' ')
 }
 
-/**
- * UUID v4. `crypto.randomUUID` n'existe que dans un contexte sécurisé
- * (https, localhost) : sur un nom local en http, on retombe sur
- * `getRandomValues`, toujours disponible, pour ne pas casser l'application.
- */
+/** UUID v4. */
 export function uid(): string {
   if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
   const b = crypto.getRandomValues(new Uint8Array(16))
@@ -121,10 +117,7 @@ export function debounce<T extends (...a: never[]) => void>(fn: T, ms: number) {
   }
 }
 
-/**
- * Certains modèles émettent leur raisonnement en ligne dans `<think>…</think>`
- * au lieu du champ `thinking` de l'API. On l'isole pour l'afficher à part.
- */
+/** Certains modèles émettent leur raisonnement en ligne dans `<think>…</think>` au lieu du champ `thinking` de l'API. */
 export function splitThinking(raw: string): { thinking: string; content: string; open: boolean } {
   const s = raw.trimStart()
   if (!s.startsWith('<think>')) return { thinking: '', content: raw, open: false }
@@ -161,11 +154,7 @@ export function formatCompact(n: number): string {
   return `${(n / 1_000_000).toFixed(1).replace('.', ',')} M`
 }
 
-/**
- * Ressemblance grossière entre deux textes, sur leurs débuts normalisés.
- * Sert à repérer qu'un message recolle une réponse déjà présente — situation
- * où le modèle tend à la reproduire au lieu de l'exécuter.
- */
+/** Ressemblance grossière entre deux textes, sur leurs débuts normalisés. */
 export function resembles(a: string, b: string, window = 240): boolean {
   const norm = (s: string) =>
     s.toLowerCase().replace(/```[a-z]*\n?/g, '').replace(/\s+/g, ' ').trim().slice(0, window)

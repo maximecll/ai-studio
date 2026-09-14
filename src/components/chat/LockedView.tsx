@@ -7,13 +7,7 @@ import { useUI } from '../../store/ui'
 import { useVault } from '../../store/vault'
 import { Button } from '../ui/primitives'
 
-/**
- * Écran d'une conversation verrouillée, coffre fermé.
- *
- * On n'affiche pas le chiffré : il n'apprend rien et ressemble à une panne.
- * On explique, et on propose l'action qui débloque. Le coffre s'ouvre de
- * lui-même à l'arrivée pour éviter un clic superflu.
- */
+/** Écran d'une conversation verrouillée, coffre fermé. */
 export function LockedView({ conv }: { conv: Conversation }) {
   const setVaultOpen = useUI((s) => s.setVaultOpen)
   const exists = useVault((s) => s.exists)

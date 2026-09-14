@@ -167,22 +167,12 @@ export function cleanParams(p: Params): Record<string, unknown> {
   return out
 }
 
-/**
- * `keep_alive` accepte soit une durée (« 5m »), soit un nombre de secondes.
- * Ollama analyse les chaînes avec le parseur de durées de Go : « -1 » y est
- * refusé (unité manquante) alors que le nombre -1 signifie « indéfiniment ».
- */
+/** `keep_alive` accepte soit une durée (« 5m »), soit un nombre de secondes. */
 export function keepAliveValue(raw: string): string | number {
   return /^-?\d+$/.test(raw.trim()) ? Number(raw) : raw
 }
 
-/**
- * Contexte à ouvrir pour un modèle donné.
- *
- * On prend le maximum annoncé par le modèle, plafonné : le cache clé-valeur
- * vit en mémoire, et un contexte démesuré sur une machine modeste provoque
- * des déchargements permanents. Le curseur reste libre d'aller plus haut.
- */
+/** Contexte à ouvrir pour un modèle donné. */
 export const CONTEXT_CAP = 32768
 
 export function suggestedContext(model: OllamaModel | undefined): number {
@@ -216,11 +206,7 @@ export function readShape(show: Record<string, unknown>): ModelShape | null {
   return { layers, kvHeads, headDim, maxContext: maxContext ?? 8192 }
 }
 
-/**
- * Octets de cache d'attention par jeton : deux tenseurs (clés et valeurs),
- * une fois par couche, par tête KV, en demi-précision.
- * Formule vérifiée à la mesure : 57 Ko/jeton prédits, 58 constatés.
- */
+/** Octets de cache d'attention par jeton : deux tenseurs (clés et valeurs), une fois par couche, par tête KV, en demi-précision. */
 export function kvBytesPerToken(shape: ModelShape): number {
   return 2 * shape.layers * shape.kvHeads * shape.headDim * 2
 }
@@ -244,12 +230,7 @@ export function hasCapability(m: OllamaModel | undefined, cap: string): boolean 
   return !!m?.capabilities?.includes(cap)
 }
 
-/**
- * Ne garde que le nom du modèle : on retire l'organisation, l'étiquette,
- * puis les marqueurs de réglage et de quantisation.
- * « huggingface.co/Org/Qwen3.8-9B-heretic-uncensored-NVFP4-GGUF:latest »
- * devient « Qwen3.8-9B ».
- */
+/** Ne garde que le nom du modèle : on retire l'organisation, l'étiquette, puis les marqueurs de réglage et de quantisation. */
 const NOISE = new RegExp(
   '^(' +
     'gguf|ggml|safetensors|awq|gptq|exl2|mlx|' +

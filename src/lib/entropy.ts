@@ -2,15 +2,7 @@ import type { TokenLogprob } from './types'
 
 const LN2 = Math.LN2
 
-/**
- * Entropie de Shannon sur la distribution renvoyée par le modèle, en bits.
- *
- * Ollama ne donne que les `top_logprobs` meilleurs candidats : la somme des
- * probabilités est donc inférieure à 1. On regroupe la masse manquante dans
- * un « reste » traité comme un seul événement, ce qui borne l'entropie par
- * le bas sans la surestimer. Avec top-8 la masse couverte dépasse
- * généralement 0,99 sur du texte ordinaire.
- */
+/** Entropie de Shannon sur la distribution renvoyée par le modèle, en bits. */
 export function tokenEntropy(top: Array<{ logprob: number }>): number {
   if (!top.length) return 0
   let h = 0

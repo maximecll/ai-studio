@@ -1,13 +1,4 @@
-/**
- * Commandes de diffusion — les mêmes dans le composeur et sur l'accueil.
- *
- * Quatre réglages sont exposés là où l'on écrit : le modèle, le format, la
- * définition et les LoRAs. Le reste (pas, guidage, graine) vit dans le panneau
- * de paramètres, parce qu'on y touche rarement.
- *
- * Le panneau agit sur une cible — la conversation ouverte, ou les valeurs par
- * défaut sur l'accueil — plutôt que d'écrire directement dans les réglages.
- */
+/** Commandes de diffusion — les mêmes dans le composeur et sur l'accueil. */
 import { useEffect } from 'react'
 import {
   Check, ChevronDown, FolderOpen, Image as ImageIcon, Layers, Maximize2,
@@ -60,11 +51,7 @@ export function ModeToggle({ mode, onChange, ready }: { mode: 'text' | 'image'; 
 
 /* ── LoRAs ────────────────────────────────────────────────────────── */
 
-/**
- * Une ligne de la bibliothèque : l'interrupteur décide de l'accès, le curseur
- * du dosage. Les deux vivent ensemble, parce qu'un LoRA activé à zéro et un
- * LoRA désactivé sont la même chose vue de deux façons.
- */
+/** Une ligne de la bibliothèque : l'interrupteur décide de l'accès, le curseur du dosage. */
 function LoraRow({ lora, model, scale, onToggle, onScale }: {
   lora: LoraFile
   model: ImageModel | undefined

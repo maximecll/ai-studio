@@ -9,10 +9,7 @@ import { useChat } from '../../store/chat'
 import { toast, useUI } from '../../store/ui'
 import { Button, Modal, SpinButton, Textarea } from '../ui/primitives'
 
-/**
- * La mémoire est lisible et modifiable : c'est le contrat de confiance.
- * L'utilisateur doit pouvoir vérifier — et corriger — ce que le modèle a retenu.
- */
+/** La mémoire est lisible et modifiable : c'est le contrat de confiance. */
 export function MemoryModal({ conv }: { conv: Conversation }) {
   const { memoryOpen, setMemoryOpen } = useUI()
   const messages = useMessages(conv.id)

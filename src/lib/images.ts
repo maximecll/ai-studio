@@ -1,12 +1,4 @@
-/**
- * Client du moteur d'images.
- *
- * Ollama ne fait pas de diffusion : la génération passe par `/images/*`, servi
- * par `server/images.mjs`, qui pilote mflux dans un processus Python séparé.
- * Les opérations longues répondent en NDJSON — même motif que les
- * téléchargements Ollama, pour que l'interface n'ait qu'une façon d'afficher
- * une progression.
- */
+/** Client du moteur d'images. */
 import type { ImageEngine, ImageModel, ImageParams, LoraChoice, LoraFile } from './types'
 
 const BASE = '/images'
@@ -154,13 +146,7 @@ export async function purgeChunkCache(): Promise<void> {
   })
 }
 
-/**
- * Récupère l'image fraîchement produite, puis la retire du dépôt temporaire.
- *
- * Le serveur n'est qu'un sas : les octets appartiennent à la base, où ils
- * seront chiffrés si la conversation est verrouillée. Les laisser traîner sur
- * le disque contredirait ce chiffrement.
- */
+/** Récupère l'image fraîchement produite, puis la retire du dépôt temporaire. */
 export async function collect(id: string): Promise<Uint8Array> {
   const res = await req(`/file?id=${encodeURIComponent(id)}`)
   const bytes = new Uint8Array(await res.arrayBuffer())
@@ -170,12 +156,7 @@ export async function collect(id: string): Promise<Uint8Array> {
 
 /* ── Format et définition ────────────────────────────────────────── */
 
-/**
- * Le format et la définition sont deux réglages distincts, parce qu'ils ne
- * coûtent pas la même chose : changer de format ne change rien au temps de
- * calcul, le doubler en définition le quadruple. Sur une puce M3, c'est le
- * levier le plus efficace dont dispose l'utilisateur.
- */
+/** Le format et la définition sont deux réglages distincts, parce qu'ils ne coûtent pas la même chose : changer de format ne change rien au temps de… */
 export const RATIOS = [
   { id: 'square', label: 'Carré', hint: '1:1', w: 1, h: 1 },
   { id: 'landscape', label: 'Paysage', hint: '3:2', w: 3, h: 2 },
@@ -194,10 +175,7 @@ export type Definition = (typeof DEFINITIONS)[number]
 
 const round16 = (n: number) => Math.max(256, Math.round(n / 16) * 16)
 
-/**
- * Dimensions d'un format à une définition donnée, à surface constante :
- * un paysage et un carré de même définition coûtent le même temps de calcul.
- */
+/** Dimensions d'un format à une définition donnée, à surface constante : un paysage et un carré de même définition coûtent le même temps de calcul. */
 export function dimensions(ratio: Ratio, def: Definition): { width: number; height: number } {
   const k = Math.sqrt(ratio.w / ratio.h)
   return { width: round16(def.px * k), height: round16(def.px / k) }
@@ -225,14 +203,7 @@ export function imageModelName(m: ImageModel | undefined): string {
   return m ? `${m.name} · ${m.variant}` : 'Modèle d’images'
 }
 
-/**
- * Temps de calcul attendu, en millisecondes.
- *
- * Le coût suit la surface de l'image, puisque c'est le nombre de jetons latents
- * qui commande le travail, et la taille du modèle. Le coût par pas vient du
- * catalogue : chronométré pour FLUX.1 dev sur cette machine (27 s à 768 × 768),
- * déduit de la taille pour les autres tant qu'ils n'ont pas tourné.
- */
+/** Temps de calcul attendu, en millisecondes. */
 export function estimate(
   steps: number, width: number, height: number,
   msPerStep = 27_000, loadMs = 20_000,
@@ -241,13 +212,7 @@ export function estimate(
   return loadMs + steps * msPerStep * area
 }
 
-/**
- * Un LoRA vise-t-il bien ce modèle ?
- *
- * Un adaptateur est un jeu de corrections adressées à des couches nommées d'une
- * architecture précise. Chargé sur une autre famille, aucun nom ne correspond :
- * il se charge sans erreur et ne fait rien. Mieux vaut le dire avant.
- */
+/** Un LoRA vise-t-il bien ce modèle ? */
 export function loraFits(lora: LoraFile, model: ImageModel | undefined): boolean | null {
   if (!model) return null
   // La famille se lit dans les noms de tenseurs, jamais dans les métadonnées.

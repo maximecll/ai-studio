@@ -1,14 +1,4 @@
-/**
- * Chiffrement au repos des conversations verrouillées.
- *
- * Une clé maîtresse aléatoire chiffre les contenus. Elle n'est jamais stockée
- * en clair : le coffre ne garde qu'une version scellée par une clé dérivée de
- * la phrase de passe. Sans la phrase, le coffre est un bloc inerte.
- *
- * Le nombre d'itérations est calibré sur la machine (≈ 310 ms sur un M3, qui
- * accélère SHA-256 en matériel) et mémorisé dans le coffre, afin de pouvoir
- * être relevé plus tard sans invalider les coffres existants.
- */
+/** Chiffrement au repos des conversations verrouillées. */
 
 export const KDF_ITERATIONS = 4_000_000
 const PREFIX = 'enc:v1:'
@@ -168,11 +158,7 @@ export async function openText(master: CryptoKey, payload: string): Promise<stri
 
 /* ── Chiffrement des pièces binaires ──────────────────────────────── */
 
-/**
- * Une image pèse un million de fois un titre : la passer en base64 comme le
- * texte gonflerait la base d'un tiers pour rien. Les octets restent donc des
- * octets, et le vecteur d'initialisation voyage à côté, dans sa propre colonne.
- */
+/** Une image pèse un million de fois un titre : la passer en base64 comme le texte gonflerait la base d'un tiers pour rien. */
 export interface SealedBytes {
   iv: string
   data: Uint8Array

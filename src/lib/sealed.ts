@@ -1,10 +1,4 @@
-/**
- * Couche de scellement appliquée au passage de la base.
- *
- * La clé maîtresse vit uniquement en mémoire, déposée ici par le magasin du
- * coffre. Les fonctions de lecture et d'écriture de `db.ts` traversent ce
- * module : c'est le seul point où du texte clair devient du chiffré.
- */
+/** Couche de scellement appliquée au passage de la base. */
 import { isSealed, openBytes, openText, sealBytes, sealText } from './crypto'
 import type { Conversation, ImageBlob, Message } from './types'
 
@@ -65,12 +59,7 @@ export async function openMessage(msg: Message): Promise<Message> {
 
 /* ── Images ───────────────────────────────────────────────────────── */
 
-/**
- * Les octets d'une image suivent la même règle que le texte : chiffrés dès
- * que la conversation est verrouillée, et illisibles sans la clé maîtresse.
- * Le vecteur d'initialisation est rangé à côté plutôt qu'en préfixe, pour
- * que la donnée reste un Blob que le navigateur sait manipuler tel quel.
- */
+/** Les octets d'une image suivent la même règle que le texte : chiffrés dès que la conversation est verrouillée, et illisibles sans la clé maîtresse. */
 export async function sealImage(bytes: Uint8Array, type: string, locked: boolean): Promise<Pick<ImageBlob, 'data' | 'sealed' | 'iv' | 'type'>> {
   if (!locked || !master) {
     return { data: new Blob([bytes as BlobPart], { type }), sealed: 0, type }

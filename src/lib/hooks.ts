@@ -19,14 +19,7 @@ export function useSettings(): Settings {
   )
 }
 
-/**
- * URL affichable d'une image rangée en base.
- *
- * `null` signifie « pas encore » ou « coffre fermé » — les deux se distinguent
- * par l'état du coffre, dont dépend cette lecture. L'URL est partagée avec la
- * tâche de génération qui vient de produire l'image, pour que le passage de
- * l'animation au message ne redessine rien.
- */
+/** URL affichable d'une image rangée en base. */
 export function useImageURL(blobId: string | undefined): string | null {
   const unlocked = useVault((s) => s.unlocked)
   const [url, setUrl] = useState<string | null>(() => (blobId ? (peekURL(blobId) ?? null) : null))
@@ -122,11 +115,7 @@ export interface SystemMemory {
   swapping: boolean
 }
 
-/**
- * Mémoire de la machine, relevée par le serveur.
- * Le navigateur n'y a pas accès : sans cela, impossible de dire à
- * l'utilisateur qu'un contexte ne tiendra pas.
- */
+/** Mémoire de la machine, relevée par le serveur. */
 export function useSystemMemory(intervalMs = 20_000): SystemMemory | null {
   const [memory, setMemory] = useState<SystemMemory | null>(null)
 

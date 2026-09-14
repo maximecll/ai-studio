@@ -12,10 +12,7 @@ import { SavePresetModal } from './SavePresetModal'
 import { DEFINITIONS, RATIOS, describeSize, dimensions, estimate, modelOf, roughly } from '../../lib/images'
 import { useImages } from '../../store/images'
 
-/**
- * Coût mémoire du contexte choisi. Le cache d'attention croît linéairement
- * avec la fenêtre : c'est lui qui décide si le modèle tient sur le GPU.
- */
+/** Coût mémoire du contexte choisi. */
 function MemoryHint({
   weights, shape, numCtx,
 }: { weights: number; shape: Parameters<typeof estimateMemory>[1]; numCtx: number }) {
@@ -66,13 +63,7 @@ function MemoryHint({
   )
 }
 
-/**
- * Réglages de diffusion.
- *
- * Ils sont globaux, pas attachés à une conversation : on ne règle pas le
- * guidage de FLUX comme on règle la température d'un modèle de langage — on
- * le pose une fois et on n'y revient qu'en cas de besoin.
- */
+/** Réglages de diffusion. */
 function ImageSection({ params, onPatch }: { params: ImageParams; onPatch: (p: Partial<ImageParams>) => void }) {
   const engine = useImages((s) => s.engine)
   const refresh = useImages((s) => s.refresh)
@@ -462,11 +453,7 @@ export function ConversationInspector({ conv }: { conv: Conversation }) {
   )
 }
 
-/**
- * Panneau de l'accueil : il agit sur les valeurs par défaut, qui deviennent
- * celles de la conversation créée. Pas de conversation fantôme, et le réglage
- * sert aussi aux suivantes.
- */
+/** Panneau de l'accueil : il agit sur les valeurs par défaut, qui deviennent celles de la conversation créée. */
 export function DefaultsInspector() {
   const settings = useSettings()
   return (

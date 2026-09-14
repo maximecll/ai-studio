@@ -2,17 +2,7 @@ import { CONTEXT_CAP, ollama } from './ollama'
 import type { Conversation, Message } from './types'
 import { estimateTokens } from './utils'
 
-/**
- * Mémoire de conversation.
- *
- * Plutôt que de laisser le contexte déborder puis tout perdre, on entretient
- * un mémo Markdown court qui absorbe les échanges anciens. Quand la fenêtre se
- * remplit, les vieux messages sont « repliés » : ils restent en base et
- * consultables, mais ne sont plus envoyés au modèle — le mémo les remplace.
- *
- * Le mémo suit toujours les mêmes sections, ce qui le garde lisible et évite
- * qu'il enfle à chaque passage.
- */
+/** Mémoire de conversation. */
 
 export const MEMORY_SECTIONS = ['Sujet', 'Décisions', 'Faits établis', 'Préférences', 'En cours'] as const
 
@@ -91,11 +81,7 @@ export interface CompactionPlan {
   recent: Message[]
 }
 
-/**
- * Décide ce qui doit être replié. On ne replie jamais les derniers échanges,
- * et on coupe toujours avant un message utilisateur pour ne pas séparer une
- * question de sa réponse.
- */
+/** Décide ce qui doit être replié. */
 export function plan(messages: Message[], keep = KEEP_VERBATIM): CompactionPlan | null {
   const live = messages.filter((m) => !m.folded && m.role !== 'system')
   if (live.length <= keep + 2) return null
@@ -131,16 +117,7 @@ export async function rewriteMemory(
 ): Promise<string> {
   const prompt = buildPrompt(memo || emptyMemory(), older)
 
-  /**
-   * Sans fenêtre explicite, Ollama charge le modèle avec sa valeur par défaut
-   * — 4096 — et tronque tout ce qui dépasse, en n'en avertissant que dans son
-   * propre journal. Le compactage résumait alors moins de la moitié de ce
-   * qu'on lui confiait, et détruisait le reste en repliant les messages.
-   *
-   * On dimensionne donc la fenêtre sur le prompt réellement construit, sans
-   * jamais descendre sous celle de la conversation ni dépasser le plafond
-   * tenable par la machine.
-   */
+  /** Sans fenêtre explicite, Ollama charge le modèle avec sa valeur par défaut — 4096 — et tronque tout ce qui dépasse, en n'en avertissant que dans son… */
   const needed = estimateTokens(prompt) + MEMO_PREDICT + 512
   const window = Math.min(CONTEXT_CAP, Math.max(numCtx ?? 0, needed))
 

@@ -5,12 +5,7 @@ import { useVault } from '../../store/vault'
 import { useUI } from '../../store/ui'
 import { Button, Field, Input, Modal } from '../ui/primitives'
 
-/**
- * Création et ouverture du coffre.
- *
- * Le même écran sert aux deux : la présence d'un coffre décide du discours.
- * Aucune phrase n'est mémorisée nulle part — c'est tout l'intérêt.
- */
+/** Création et ouverture du coffre. */
 export function VaultModal() {
   const { vaultOpen, setVaultOpen } = useUI()
   const { exists, unlocked, busy, error, create, unlock, load } = useVault()

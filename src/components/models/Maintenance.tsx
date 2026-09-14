@@ -16,11 +16,7 @@ interface Plan {
   busy: boolean
 }
 
-/**
- * Entretien du magasin Ollama : morceaux de téléchargements interrompus et
- * blobs qu'aucun modèle ne référence plus. Rien n'est supprimé sans confirmation,
- * et jamais un fichier en service ou en cours d'écriture.
- */
+/** Entretien du magasin Ollama : morceaux de téléchargements interrompus et blobs qu'aucun modèle ne référence plus. */
 export function Maintenance() {
   const [plan, setPlan] = useState<Plan | null>(null)
   const [working, setWorking] = useState(false)

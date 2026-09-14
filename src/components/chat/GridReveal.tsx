@@ -1,14 +1,4 @@
-/**
- * Révélation par subdivision.
- *
- * Une mosaïque part d'un seul pavé et se scinde pas à pas, cellule après
- * cellule, jusqu'à faire apparaître l'image. Le rythme n'est pas piloté par
- * un pourcentage mais par l'arrivée de l'image : la grille ralentit d'elle-même
- * en approchant de la fin et ne peut donc jamais terminer avant elle.
- *
- * Source : rareui.com/components/gridreveal — repris tel quel, aux imports et
- * aux couleurs près, qui suivent la palette d'AI Studio.
- */
+/** Révélation par subdivision. */
 import { useEffect, useRef, useState } from 'react'
 import type { ComponentProps } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'

@@ -1,10 +1,4 @@
-/**
- * État mémoire de la machine.
- *
- * `os.freemem()` est trompeur sur macOS : il ignore les pages inactives et
- * compressées, qui sont pourtant récupérables. On lit donc `vm_stat` et
- * `sysctl`, comme le ferait le moniteur d'activité.
- */
+/** État mémoire de la machine. */
 import { execFile } from 'node:child_process'
 import { totalmem } from 'node:os'
 import { promisify } from 'node:util'

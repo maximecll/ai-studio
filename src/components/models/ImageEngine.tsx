@@ -1,11 +1,4 @@
-/**
- * Moteur d'images — installation, poids, entretien.
- *
- * Ollama ne fait pas de diffusion : FLUX passe par mflux, un environnement
- * Python séparé que cette section installe et surveille. Le motif
- * d'affichage est celui des téléchargements Ollama, à dessein — une seule
- * grammaire de progression dans toute l'application.
- */
+/** Moteur d'images — installation, poids, entretien. */
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -62,13 +55,7 @@ function PullRow({ pull, onCancel }: { pull: Pull; onCancel: () => void }) {
   )
 }
 
-/**
- * Transfert repéré sur le disque, sans flux pour le décrire.
- *
- * Un téléchargement lancé hors de l'application — ou survivant à son
- * redémarrage — n'a pas de débit ni de temps restant à afficher : seul
- * l'avancement est connu. Mieux vaut le montrer ainsi que pas du tout.
- */
+/** Transfert repéré sur le disque, sans flux pour le décrire. */
 function DiskProgress({ model }: { model: ImageModel }) {
   const ratio = model.progress ?? 0
   return (
@@ -236,13 +223,7 @@ function Install() {
   )
 }
 
-/**
- * Bibliothèque de LoRAs.
- *
- * Un dossier, des fichiers : rien à importer, rien à indexer. Ce panneau ne
- * fait que montrer ce qu'il contient — le choix de ce qui s'applique se fait
- * dans la conversation, là où l'on écrit.
- */
+/** Bibliothèque de LoRAs. */
 function LoraRow({ lora, first }: { lora: LoraFile; first: boolean }) {
   return (
     <div className={cn('flex items-start gap-3 px-5 py-3.5', !first && 'border-t border-line')}>

@@ -44,14 +44,7 @@ interface ChatState {
 
 const controllers = new Map<string, AbortController>()
 
-/**
- * Surveillance du silence.
- *
- * Un flux peut cesser d'émettre sans que la connexion se ferme : le serveur
- * se tait — mémoire saturée, runner bloqué — et l'application attendrait
- * indéfiniment. On abandonne alors nous-mêmes, en conservant ce qui a déjà
- * été produit plutôt que de laisser une génération qui ne reviendra pas.
- */
+/** Surveillance du silence. */
 const FIRST_CHUNK_MS = 180_000 // le chargement d'un gros modèle peut être long
 const BETWEEN_CHUNKS_MS = 90_000
 
@@ -350,16 +343,7 @@ export const useChat = create<ChatState>((set, get) => {
     compacting: {},
     compact: (id) => compact(id, true),
 
-    /**
-     * Changer de modèle doit être transparent : le nouveau reçoit toute la
-     * conversation. Deux choses peuvent la rompre, et on les traite ici.
-     *
-     * · Une fenêtre héritée plus grande que celle du nouveau modèle : on la
-     *   ramène dans ses bornes.
-     * · Un historique qui ne tient plus dedans : Ollama le tronquerait en
-     *   silence, en jetant le début. On compacte plutôt, pour que la substance
-     *   passe dans la mémoire au lieu de disparaître.
-     */
+    /** Changer de modèle doit être transparent : le nouveau reçoit toute la conversation. */
     async switchModel(conversationId, model, maxContext) {
       const conv = await db.conversations.get(conversationId)
       if (!conv || conv.model === model) return

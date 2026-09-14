@@ -1,7 +1,4 @@
-/**
- * Génère l'icône de l'application — sans dépendance, en écrivant le PNG à la main.
- * Squircle façon macOS, dégradé violet monday, étoile blanche à quatre branches.
- */
+/** Génère l'icône de l'application — sans dépendance, en écrivant le PNG à la main. */
 import { deflateSync } from 'node:zlib'
 import { writeFileSync } from 'node:fs'
 

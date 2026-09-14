@@ -19,10 +19,7 @@ function Bar({ pct, tone }: { pct: number; tone: string }) {
   )
 }
 
-/**
- * Avancement d'un téléchargement.
- * `compact` sert à l'afficher dans la carte du modèle lui-même.
- */
+/** Avancement d'un téléchargement. */
 export function DownloadRow({ dl, compact }: { dl: Download; compact?: boolean }) {
   const { cancel, dismiss } = useDownloads()
   const pct = dl.total > 0 ? (dl.completed / dl.total) * 100 : 0

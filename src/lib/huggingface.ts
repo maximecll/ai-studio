@@ -1,9 +1,4 @@
-/**
- * Recherche de modèles GGUF sur Hugging Face.
- *
- * L'API publique restreint son CORS : tout passe par le relais `/hf` du
- * serveur local. Ollama ne sait tirer que du GGUF, d'où le filtre.
- */
+/** Recherche de modèles GGUF sur Hugging Face. */
 
 const BASE = '/hf/api'
 
@@ -82,11 +77,7 @@ export function reference(repo: string, quant?: string): string {
   return quant ? `hf.co/${repo}:${quant}` : `hf.co/${repo}`
 }
 
-/**
- * Rend utilisable ce que l'utilisateur a tapé.
- * Une URL Hugging Face, un « org/dépôt » ou une référence déjà complète
- * aboutissent tous à quelque chose qu'Ollama comprend.
- */
+/** Rend utilisable ce que l'utilisateur a tapé. */
 export function normalize(input: string): string {
   let s = input.trim()
   if (!s) return s

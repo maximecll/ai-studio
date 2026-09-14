@@ -42,12 +42,7 @@ function Metric({ label, value, title }: { label: string; value: string; title: 
 
 /* ── Génération en cours ──────────────────────────────────────────── */
 
-/**
- * La mosaïque tient la place de l'image jusqu'à ce qu'elle existe, puis la
- * révèle. Elle reste montée d'un bout à l'autre : le message définitif ne
- * prend le relais qu'une fois l'animation jouée, sur la même image déjà
- * chargée, ce qui rend le passage invisible.
- */
+/** La mosaïque tient la place de l'image jusqu'à ce qu'elle existe, puis la révèle. */
 export function GeneratingImage({ job, onCancel, onRevealed }: { job: Job; onCancel: () => void; onRevealed: () => void }) {
   const aspect = job.width / job.height
   return (

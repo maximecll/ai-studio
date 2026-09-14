@@ -19,10 +19,7 @@ const VIEWS: Array<{ value: Transcript; label: string; icon: React.ReactNode; hi
   { value: 'detailed', label: 'Détaillée', icon: <LayoutList className="size-4" />, hint: 'Tout est déplié' },
 ]
 
-/**
- * En-tête en trois zones de largeur égale : le titre est centré
- * mathématiquement, quel que soit le nombre d'actions de part et d'autre.
- */
+/** En-tête en trois zones de largeur égale : le titre est centré mathématiquement, quel que soit le nombre d'actions de part et d'autre. */
 export function TopBar({ conv }: { conv: Conversation }) {
   const { sidebarOpen, inspectorOpen, toggleInspector, setMemoryOpen } = useUI()
   const refresh = useModels((s) => s.refresh)
