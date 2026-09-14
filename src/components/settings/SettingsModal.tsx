@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Download, Monitor, Moon, Sun, Trash2, Upload } from 'lucide-react'
-import { db, deleteAllConversations, exportJSON, importJSON, patchSettings } from '../../lib/db'
+import { db, deleteAllConversations, exportJSON, imagesWeight, importJSON, patchSettings } from '../../lib/db'
 import { useSettings } from '../../lib/hooks'
 import type { Theme, Transcript, UIFont } from '../../lib/types'
 import { cn, download, formatBytes } from '../../lib/utils'
@@ -78,10 +78,17 @@ export function SettingsModal() {
   const models = useModels((s) => s.models)
   const [confirmWipe, setConfirmWipe] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
-  const [counts, setCounts] = useState<{ conv: number; msg: number } | null>(null)
+  const [counts, setCounts] = useState<{ conv: number; msg: number; img: number; imgBytes: number } | null>(null)
 
-  const loadCounts = async () =>
-    setCounts({ conv: await db.conversations.count(), msg: await db.messages.count() })
+  const loadCounts = async () => {
+    const pictures = await imagesWeight()
+    setCounts({
+      conv: await db.conversations.count(),
+      msg: await db.messages.count(),
+      img: pictures.count,
+      imgBytes: pictures.bytes,
+    })
+  }
 
   return (
     <Modal
@@ -169,19 +176,39 @@ export function SettingsModal() {
               placeholder="Tu es un assistant francophone…"
             />
           </Field>
-          <Field label="Libérer la mémoire après" hint="Délai d'inactivité au bout duquel Ollama décharge le modèle.">
+          <Field
+            label="Libérer la mémoire après"
+            hint="Délai d'inactivité au bout duquel Ollama décharge le modèle."
+          >
             <Segmented
               options={KEEP_ALIVE}
               value={settings.keepAlive}
               onChange={(v) => void patchSettings({ keepAlive: v })}
             />
+            {/* Ce choix a coûté un facteur cinq sur le débit : autant dire
+                pourquoi, là où on le fait. */}
+            {settings.keepAlive === '-1' && (
+              <p className="mt-2 rounded-sm bg-caution-wash px-3 py-2.5 text-[13px] leading-snug text-fg-muted">
+                Ollama décide au chargement combien de couches partent sur le GPU. Si la mémoire
+                est saturée à cet instant, il n'en met aucune — et un modèle qui ne se décharge
+                jamais garde cette décision pour de bon. Le débit reste alors cinq fois plus faible
+                jusqu'au redémarrage d'Ollama. « 1 h » garde le modèle chaud sans ce risque.
+              </p>
+            )}
           </Field>
         </Group>
 
         <Group title="Données">
           <p className="text-[14px] text-fg-muted">
             {counts
-              ? `${counts.conv} conversation${counts.conv > 1 ? 's' : ''} · ${counts.msg} message${counts.msg > 1 ? 's' : ''} · IndexedDB « ollama-studio »`
+              ? [
+                  `${counts.conv} conversation${counts.conv > 1 ? 's' : ''}`,
+                  `${counts.msg} message${counts.msg > 1 ? 's' : ''}`,
+                  /* Les images pèsent mille fois un message : leur poids mérite
+                     d'être dit, pas seulement leur nombre. */
+                  counts.img > 0 ? `${counts.img} image${counts.img > 1 ? 's' : ''} (${formatBytes(counts.imgBytes)})` : null,
+                  'IndexedDB « ollama-studio »',
+                ].filter(Boolean).join(' · ')
               : 'IndexedDB « ollama-studio »'}
           </p>
           <div className="flex flex-wrap gap-2">

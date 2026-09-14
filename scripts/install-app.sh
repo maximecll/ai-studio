@@ -11,14 +11,29 @@ set -euo pipefail
 PROJECT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Les applications lancées depuis le Finder n'héritent pas du PATH du shell :
-# on fige les chemins absolus au moment de l'installation.
+# on fige les chemins absolus au moment de l'installation. Le lanceur remet
+# ensuite le dossier de Node en tête du PATH, sans quoi npm — qui se relance
+# via `#!/usr/bin/env node` — ne retrouverait pas son propre interpréteur.
 NODE_BIN="$(command -v node)"
 NPM_BIN="$(command -v npm)"
 OLLAMA_BIN="$(command -v ollama || echo /usr/local/bin/ollama)"
 
+[ -n "$NODE_BIN" ] || { echo "Node.js est introuvable. Installez-le, puis relancez." >&2; exit 1; }
+
 echo "Projet : $PROJECT"
-echo "Node   : $NODE_BIN"
+echo "Node   : $NODE_BIN  ($("$NODE_BIN" --version))"
 echo "Ollama : $OLLAMA_BIN"
+
+# Un gestionnaire de versions déplace Node à chaque mise à jour : le chemin figé
+# ici cesserait alors d'exister. Autant le dire maintenant que le découvrir un
+# matin, devant une application qui refuse de démarrer.
+case "$NODE_BIN" in
+  */.nvm/*|*/.volta/*|*/.fnm/*|*/fnm_multishells/*)
+    echo
+    echo "Note : ce Node vient d'un gestionnaire de versions."
+    echo "       Après un changement de version, relancez ce script."
+    ;;
+esac
 echo
 
 TMP="$(mktemp -d)"

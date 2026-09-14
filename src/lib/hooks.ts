@@ -1,12 +1,46 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useState } from 'react'
 import { useVault } from '../store/vault'
+import { loadURL, peekURL } from '../store/images'
 import { DEFAULT_SETTINGS, db, messagesOf } from './db'
 import { openConversation } from './sealed'
 import type { Conversation, Message, Preset, Settings } from './types'
 
 export function useSettings(): Settings {
-  return useLiveQuery(async () => (await db.settings.get('app')) ?? DEFAULT_SETTINGS, [], DEFAULT_SETTINGS)
+  /* Fusionnés sur les valeurs d'origine : une base créée avant l'ajout d'une
+     option ne doit pas rendre ce champ indéfini au premier rendu. */
+  return useLiveQuery(
+    async () => {
+      const stored = await db.settings.get('app')
+      return stored ? { ...DEFAULT_SETTINGS, ...stored } : DEFAULT_SETTINGS
+    },
+    [],
+    DEFAULT_SETTINGS,
+  )
+}
+
+/**
+ * URL affichable d'une image rangée en base.
+ *
+ * `null` signifie « pas encore » ou « coffre fermé » — les deux se distinguent
+ * par l'état du coffre, dont dépend cette lecture. L'URL est partagée avec la
+ * tâche de génération qui vient de produire l'image, pour que le passage de
+ * l'animation au message ne redessine rien.
+ */
+export function useImageURL(blobId: string | undefined): string | null {
+  const unlocked = useVault((s) => s.unlocked)
+  const [url, setUrl] = useState<string | null>(() => (blobId ? (peekURL(blobId) ?? null) : null))
+
+  useEffect(() => {
+    if (!blobId) return setUrl(null)
+    let alive = true
+    const cached = peekURL(blobId)
+    if (cached) return setUrl(cached)
+    void loadURL(blobId).then((u) => { if (alive) setUrl(u) })
+    return () => { alive = false }
+  }, [blobId, unlocked])
+
+  return url
 }
 
 /** `undefined` tant que la base n'a pas répondu — à distinguer d'une base vide. */

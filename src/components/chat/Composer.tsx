@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Brain, Check, ChevronDown, Circle, Paperclip, Send, Square } from 'lucide-react'
-import { updateConversation } from '../../lib/db'
+import { Brain, Check, ChevronDown, Circle, Image as ImageIcon, Paperclip, Send, Square } from 'lucide-react'
+import { imageParamsOf, updateConversation } from '../../lib/db'
 import { usePresets } from '../../lib/hooks'
-import type { Conversation, Settings } from '../../lib/types'
+import type { Conversation, ImageParams, Settings } from '../../lib/types'
 import { cn, estimateTokens, formatCompact, formatNumber, modKey } from '../../lib/utils'
 import { prettyModel } from '../../lib/ollama'
 import { PresetGlyph } from '../../lib/preset-icons'
@@ -11,6 +11,7 @@ import { useChat } from '../../store/chat'
 import { useUI } from '../../store/ui'
 import { Button, Chip, Menu, MenuItem, MenuLabel, MenuSeparator, MorphButton, Tooltip } from '../ui/primitives'
 import { href, navigate } from '../../lib/router'
+import { ImageControls, ModeToggle, useImageEngine } from './ImageControls'
 
 /** Sélecteur de modèle — placé là où l'on écrit, pas dans l'en-tête. */
 function ModelChip({ conv }: { conv: Conversation }) {
@@ -108,8 +109,27 @@ function PresetChip({ conv }: { conv: Conversation }) {
   )
 }
 
+/**
+ * Bascule texte / image.
+ *
+ * Le choix reste collé à la conversation : on décrit rarement une image puis
+ * on repose une question dans la foulée, et retrouver le mode où on l'avait
+ * laissé évite de se tromper d'envoi.
+ */
+export function useComposerMode(conversationId: string) {
+  const [mode, setMode] = useState<'text' | 'image'>('text')
+  useEffect(() => {
+    setMode(sessionStorage.getItem(`mode.${conversationId}`) === 'image' ? 'image' : 'text')
+  }, [conversationId])
+  const choose = (next: 'text' | 'image') => {
+    setMode(next)
+    sessionStorage.setItem(`mode.${conversationId}`, next)
+  }
+  return [mode, choose] as const
+}
+
 export function Composer({
-  conversation, settings, streaming, usedTokens, hasMemory, onSend, onStop,
+  conversation, settings, streaming, usedTokens, hasMemory, onSend, onGenerate, generating, onStop,
 }: {
   conversation: Conversation
   settings: Settings
@@ -118,10 +138,22 @@ export function Composer({
   usedTokens: number
   hasMemory: boolean
   onSend: (text: string) => void
+  /** Envoi en mode image — la description part vers le moteur de diffusion. */
+  onGenerate: (prompt: string, params: ImageParams) => void
+  generating: boolean
   onStop: () => void
 }) {
   const [text, setText] = useState('')
   const ref = useRef<HTMLTextAreaElement>(null)
+  const [mode, setMode] = useComposerMode(conversation.id)
+  const { engine } = useImageEngine()
+  const hasImageModel = (engine?.catalog ?? []).some((m) => m.installed)
+  const image = mode === 'image' && hasImageModel
+  const busy = image ? generating : streaming
+
+  /* Les réglages de diffusion appartiennent à la conversation, comme ceux du
+     modèle de langage : changer de format ici ne doit rien changer ailleurs. */
+  const imageParams = imageParamsOf(conversation, settings)
 
   useEffect(() => {
     setText(sessionStorage.getItem(`draft.${conversation.id}`) ?? '')
@@ -135,9 +167,10 @@ export function Composer({
 
   const submit = () => {
     const t = text.trim()
-    if (!t || streaming) return
+    if (!t || busy) return
     setText('')
-    onSend(t)
+    if (image) onGenerate(t, imageParams)
+    else onSend(t)
   }
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -169,7 +202,13 @@ export function Composer({
             onChange={(e) => setText(e.target.value)}
             onKeyDown={onKeyDown}
             rows={1}
-            placeholder={streaming ? 'Génération en cours…' : 'Écrivez votre message…'}
+            placeholder={
+              busy
+                ? 'Génération en cours…'
+                : image
+                  ? 'Décrivez l’image à produire…'
+                  : 'Écrivez votre message…'
+            }
             className={cn(
               'block max-h-[40vh] min-h-12 w-full resize-none bg-transparent px-5 pt-4 pb-1',
               'text-[15px] leading-[1.6] text-fg outline-none scroll-thin placeholder:text-fg-subtle',
@@ -181,23 +220,37 @@ export function Composer({
               le bouton d'envoi reste dans la carte à toute largeur. */}
           <div className="flex h-14 items-center gap-1.5 px-3">
             <div className="flex min-w-0 flex-1 items-center gap-1.5">
-              <ModelChip conv={conversation} />
-              <PresetChip conv={conversation} />
-              {hasMemory && (
-                <Tooltip label="Une mémoire résume les échanges anciens de cette conversation" side="top">
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full text-fg-subtle">
-                    <Brain className="size-4" />
-                  </span>
-                </Tooltip>
+              <ModeToggle mode={mode} onChange={setMode} ready={hasImageModel} />
+              {image ? (
+                <ImageControls
+                  params={imageParams}
+                  onPatch={(patch) =>
+                    void updateConversation(conversation.id, { imageParams: { ...imageParams, ...patch } })
+                  }
+                />
+              ) : (
+                <>
+                  <ModelChip conv={conversation} />
+                  <PresetChip conv={conversation} />
+                  {hasMemory && (
+                    <Tooltip label="Une mémoire résume les échanges anciens de cette conversation" side="top">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full text-fg-subtle">
+                        <Brain className="size-4" />
+                      </span>
+                    </Tooltip>
+                  )}
+                </>
               )}
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
-              <Tooltip label="Les pièces jointes arrivent bientôt" side="top">
-                <Button size="icon-sm" disabled className="hidden sm:inline-flex"><Paperclip className="size-4" /></Button>
-              </Tooltip>
+              {!image && (
+                <Tooltip label="Les pièces jointes arrivent bientôt" side="top">
+                  <Button size="icon-sm" disabled className="hidden sm:inline-flex"><Paperclip className="size-4" /></Button>
+                </Tooltip>
+              )}
 
-              <Tooltip
+              {!image && <Tooltip
                 label={`${formatNumber(used)} jetons sur ${formatNumber(ctxMax)} — ${Math.round(filled * 100)} % du contexte`}
                 side="top"
               >
@@ -212,17 +265,21 @@ export function Composer({
                     {formatCompact(used)} / {formatCompact(ctxMax)}
                   </span>
                 </span>
-              </Tooltip>
+              </Tooltip>}
 
-              {streaming ? (
+              {busy ? (
                 <Button variant="soft" size="icon" onClick={onStop} title="Arrêter (Échap)" aria-label="Arrêter">
                   <Square className="size-3 fill-current" />
                 </Button>
               ) : (
                 <MorphButton
-                  idle={Send} hover={Check} variant="primary" size="icon"
-                  iconClassName="translate-x-px -translate-y-px"
-                  title={settings.sendOnEnter ? 'Envoyer (Entrée)' : `Envoyer (${modKey}+Entrée)`}
+                  idle={image ? ImageIcon : Send} hover={Check} variant="primary" size="icon"
+                  iconClassName={image ? undefined : 'translate-x-px -translate-y-px'}
+                  title={
+                    image
+                      ? 'Produire l’image'
+                      : settings.sendOnEnter ? 'Envoyer (Entrée)' : `Envoyer (${modKey}+Entrée)`
+                  }
                   disabled={!text.trim()} onClick={submit}
                 />
               )}

@@ -3,6 +3,7 @@
  * Serveur local de Studio.
  * - sert le build statique de `dist/`
  * - relaie `/ollama/*` vers Ollama (évite toute configuration CORS)
+ * - expose `/images/*`, la génération d'images par FLUX (cf. server/images.mjs)
  * Aucune dépendance : Node seul suffit.
  */
 import { createServer, request as httpRequest } from 'node:http'
@@ -12,6 +13,7 @@ import { extname, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { handle as handleBlobs } from './server/blobs.mjs'
 import { handle as handleMemory } from './server/system.mjs'
+import { handle as handleImages } from './server/images.mjs'
 
 const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)))
 const DIST = join(ROOT, 'dist')
@@ -108,6 +110,7 @@ function handle(req, res) {
   if (req.url.startsWith('/hf')) return proxyHuggingFace(req, res)
   if (req.url.startsWith('/maintenance/blobs')) return void handleBlobs(req, res)
   if (req.url.startsWith('/maintenance/memory')) return void handleMemory(req, res)
+  if (req.url.startsWith('/images/')) return void handleImages(req, res)
 
   const url = new URL(req.url, `http://${HOST}`)
   const rel = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, '')

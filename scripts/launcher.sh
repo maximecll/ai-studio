@@ -4,14 +4,67 @@ LOG="$HOME/Library/Logs/Studio"
 mkdir -p "$LOG"
 
 notify() { osascript -e "display notification \"$1\" with title \"$APP_NAME\"" >/dev/null 2>&1; }
+
+# Une chaîne AppleScript n'admet ni guillemet nu, ni antislash, ni retour à la
+# ligne littéral : sans cette conversion, un extrait de journal casserait la
+# boîte de dialogue au lieu de s'y afficher.
+applescript_string() {
+  printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | awk 'BEGIN{ORS=""} NR>1{print "\\n"} {print}'
+}
+
 fail() {
-  osascript -e "display dialog \"$1\" with title \"$APP_NAME\" buttons {\"OK\"} default button 1 with icon caution" >/dev/null 2>&1
+  local body
+  body="$(applescript_string "$1")"
+  osascript -e "display dialog \"$body\" with title \"$APP_NAME\" buttons {\"OK\"} default button 1 with icon caution" >/dev/null 2>&1
   exit 1
+}
+
+# Dernières lignes utiles d'un journal, pour dire ce qui a réellement échoué.
+why() {
+  [ -f "$1" ] || return 0
+  tail -5 "$1" 2>/dev/null | grep -v '^[[:space:]]*$' | tail -3
 }
 alive() { curl -fsS --max-time 2 "$1" >/dev/null 2>&1; }
 listening() { nc -z 127.0.0.1 "$PORT" >/dev/null 2>&1; }
 
-[ -x "$NODE" ] || fail "Node.js est introuvable ($NODE). Relancez scripts/install-app.sh."
+# ── Node ──────────────────────────────────────────────────────────────
+#
+# Le chemin figé à l'installation survit mal à un gestionnaire de versions :
+# `nvm install` puis `nvm uninstall` le fait disparaître. Plutôt que d'échouer,
+# on cherche un remplaçant aux endroits habituels — la version la plus récente
+# d'abord — et on n'abandonne que s'il n'y a vraiment rien.
+if [ ! -x "$NODE" ]; then
+  for candidate in \
+    "$(ls -d "$HOME"/.nvm/versions/node/*/bin/node 2>/dev/null | sort -V | tail -1)" \
+    "$HOME/.volta/bin/node" \
+    /opt/homebrew/bin/node \
+    /usr/local/bin/node
+  do
+    [ -n "$candidate" ] && [ -x "$candidate" ] || continue
+    NODE="$candidate"
+    [ -x "$(dirname "$NODE")/npm" ] && NPM="$(dirname "$NODE")/npm"
+    break
+  done
+fi
+
+[ -x "$NODE" ] || fail "Node.js est introuvable.
+
+Le chemin figé à l'installation n'existe plus, et aucune autre installation n'a été trouvée.
+
+Installez Node, puis relancez : bash scripts/install-app.sh"
+
+# Les chemins absolus ci-dessus ne suffisent pas.
+#
+# `npm` est un lien vers `npm-cli.js`, dont la première ligne est
+# `#!/usr/bin/env node` : npm relance donc node lui-même, en le cherchant dans
+# le PATH. Or une application lancée depuis le Finder n'hérite pas du shell —
+# elle reçoit /usr/bin:/bin:/usr/sbin:/sbin, sans nvm ni Homebrew. D'où
+# « env: node: No such file or directory », et un serveur qui ne démarre jamais.
+#
+# Vite, esbuild et les scripts npm du projet dépendent tous de cette résolution.
+PATH="$(dirname "$NODE"):$PATH"
+export PATH
+
 cd "$PROJECT" || fail "Dossier du projet introuvable : $PROJECT"
 
 PROFILE="$HOME/Library/Application Support/Studio/$MODE"
@@ -58,16 +111,62 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # 1 ── Ollama
-if ! alive "http://127.0.0.1:11434/api/version"; then
-  [ -x "$OLLAMA" ] || fail "Ollama est introuvable ($OLLAMA)."
-  notify "Démarrage d'Ollama…"
+#
+# Ollama sonde le GPU au démarrage en lançant un sous-processus, sous chien de
+# garde. Si la mémoire est saturée à cet instant, la sonde expire et le démon
+# retombe sur le processeur — **définitivement**, car il ne re-sonde jamais.
+# Tout tourne alors cinq fois plus lentement, sans le moindre message.
+#
+# On vérifie donc ce qu'il a trouvé, et on recommence si besoin.
+
+# Vrai si le démon a bien vu le GPU. La ligne « inference compute » est la
+# seule source d'information : l'API ne l'expose pas.
+#
+# Le journal s'accumule d'une session à l'autre : on ne lit que ce qui suit le
+# repère écrit juste avant ce démarrage-ci, sans quoi une réussite d'hier
+# passerait pour la réussite d'aujourd'hui.
+metal_found() {
+  awk '/^--- démarrage /{ buf = "" ; next } { buf = buf $0 "\n" } END { printf "%s", buf }' \
+    "$LOG/ollama.log" 2>/dev/null | grep -q 'library=Metal'
+}
+
+start_ollama() {
   nohup "$OLLAMA" serve >> "$LOG/ollama.log" 2>&1 &
   OLLAMA_PID=$!
   for _ in $(seq 1 60); do
-    alive "http://127.0.0.1:11434/api/version" && break
+    alive "http://127.0.0.1:11434/api/version" && return 0
     sleep 0.5
   done
-  alive "http://127.0.0.1:11434/api/version" || fail "Ollama n'a pas démarré. Détails : ~/Library/Logs/Studio/ollama.log"
+  return 1
+}
+
+if ! alive "http://127.0.0.1:11434/api/version"; then
+  [ -x "$OLLAMA" ] || fail "Ollama est introuvable ($OLLAMA)."
+  notify "Démarrage d'Ollama…"
+
+  attempt=1
+  while :; do
+    echo "--- démarrage $(date '+%F %T') (tentative $attempt) ---" >> "$LOG/ollama.log"
+    start_ollama || fail "Ollama n'a pas démarré.
+
+$(why "$LOG/ollama.log")
+
+Journal : ~/Library/Logs/Studio/ollama.log"
+
+    # Laisser la sonde se terminer avant de juger.
+    sleep 3
+    metal_found && break
+
+    [ "$attempt" -ge 2 ] && {
+      notify "Ollama tourne sur le processeur — cinq fois plus lent."
+      break
+    }
+    # La sonde a échoué : on laisse la mémoire retomber, puis on recommence.
+    kill "$OLLAMA_PID" 2>/dev/null
+    OLLAMA_PID=""
+    attempt=$((attempt + 1))
+    sleep 6
+  done
 fi
 
 # 2 ── Dépendances
@@ -91,7 +190,11 @@ if ! listening; then
     fi
     if [ "$needs_build" = 1 ]; then
       notify "Mise à jour de l'interface…"
-      "$NPM" run build >> "$LOG/build.log" 2>&1 || fail "La construction a échoué. Détails : ~/Library/Logs/Studio/build.log"
+      "$NPM" run build >> "$LOG/build.log" 2>&1 || fail "La construction de l'interface a échoué.
+
+$(why "$LOG/build.log")
+
+Journal : ~/Library/Logs/Studio/build.log"
     fi
     nohup "$NODE" "$PROJECT/server.mjs" >> "$LOG/server.log" 2>&1 &
   fi
@@ -101,7 +204,15 @@ if ! listening; then
     listening && break
     sleep 0.25
   done
-  listening || fail "Le serveur n'a pas démarré. Détails : ~/Library/Logs/Studio/"
+  if ! listening; then
+    log_file="$LOG/dev.log"
+    [ "$MODE" = "dev" ] || log_file="$LOG/server.log"
+    fail "Le serveur n'a pas démarré après 30 secondes.
+
+$(why "$log_file")
+
+Journal : ~/Library/Logs/Studio/"
+  fi
 fi
 
 # 4 ── Fenêtre dédiée, puis attente.

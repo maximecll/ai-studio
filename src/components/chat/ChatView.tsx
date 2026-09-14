@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useState } from 'react'
 import { ArrowDown, Brain, ChevronDown, Loader2, RefreshCw } from 'lucide-react'
-import { createConversation, db, deleteMessagesFrom } from '../../lib/db'
+import { createConversation, db, deleteImage, deleteMessagesFrom } from '../../lib/db'
 import { href, navigate } from '../../lib/router'
 import { useMessages, useSettings } from '../../lib/hooks'
-import type { Conversation } from '../../lib/types'
+import type { Conversation, ImageMeta, ImageParams } from '../../lib/types'
 import { cn, resembles } from '../../lib/utils'
 import { contextUsage } from '../../lib/memory'
 import { estimateTokens } from '../../lib/utils'
@@ -14,6 +14,8 @@ import { Composer } from './Composer'
 import { TopBar } from '../layout/TopBar'
 import { LockedView } from './LockedView'
 import { useVault } from '../../store/vault'
+import { useImages } from '../../store/images'
+import { GeneratingImage, ImageMessage } from './ImageMessage'
 
 export function ChatView({ conv }: { conv: Conversation }) {
   const vaultUnlocked = useVault((s) => s.unlocked)
@@ -21,7 +23,14 @@ export function ChatView({ conv }: { conv: Conversation }) {
   const settings = useSettings()
   const stream = useChat((s) => s.streams[conv.id])
   const { send, stop, regenerate, editUserMessage, continueLast } = useChat()
-  const { ref, atBottom, scrollToBottom } = useStickToBottom([messages.length, stream?.content, stream?.thinking])
+  /* La diffusion a son propre moteur : une tâche par conversation, suivie
+     hors du flux de jetons. */
+  const job = useImages((s) => s.jobs[conv.id])
+  const { create: generate, cancel: cancelImage, finish: finishImage } = useImages()
+
+  const { ref, atBottom, scrollToBottom } = useStickToBottom([
+    messages.length, stream?.content, stream?.thinking, job?.step, job?.phase,
+  ])
 
   const compacting = useChat((s) => !!s.compacting[conv.id])
   const [showFolded, setShowFolded] = useState(false)
@@ -34,9 +43,16 @@ export function ChatView({ conv }: { conv: Conversation }) {
   const ctxMax = conv.params.num_ctx ?? 4096
   const usedTokens = Math.round(contextUsage(conv, messages) * ctxMax) + streamed
   const streaming = !!stream
+  /** Texte ou image : dans les deux cas la conversation travaille. */
+  const busy = streaming || !!job
   const lastAssistantId = [...live].reverse().find((m) => m.role === 'assistant')?.id
-  /* Flux interrompu (rechargement, coupure) : la question reste sans réponse. */
-  const awaitingAnswer = !streaming && live.length > 0 && live.at(-1)?.role === 'user'
+  /* Flux interrompu (rechargement, coupure) : la question reste sans réponse.
+     Une diffusion en cours n'en est pas une : son message arrivera. */
+  const pending = live.at(-1)
+  const awaitingAnswer = !busy && live.length > 0 && pending?.role === 'user'
+  /* La description partait vers le moteur d'images : la relancer vers le
+     modèle de texte n'aurait aucun sens. */
+  const awaitingImage = awaitingAnswer ? pending?.imageRequest : undefined
   const shown = showFolded ? messages : live
 
   /* Recoller une réponse déjà présente pousse le modèle à la reproduire au lieu
@@ -55,6 +71,32 @@ export function ChatView({ conv }: { conv: Conversation }) {
 
   /* Un message rejoué dans une conversation neuve échappe à l'influence des
      tours précédents — c'est le remède au modèle qui recopie ce qu'il a lu. */
+  const onGenerate = useCallback(
+    (prompt: string, params: ImageParams) => void generate(conv.id, prompt, params),
+    [conv.id, generate],
+  )
+
+  /** Régénère une image : même description, nouvelle graine. */
+  const regenerateImage = useCallback(
+    (meta: ImageMeta) =>
+      void generate(conv.id, meta.prompt, {
+        model: meta.model,
+        width: meta.width,
+        height: meta.height,
+        steps: meta.steps,
+        guidance: meta.guidance,
+        loras: meta.loras,
+        seed: null,
+      }),
+    [conv.id, generate],
+  )
+
+  /** Supprimer un message porteur d'image emporte aussi ses octets. */
+  const dropMessage = useCallback(async (id: string, blobId?: string) => {
+    await db.messages.delete(id)
+    if (blobId) await deleteImage(blobId)
+  }, [])
+
   const restart = useCallback(
     async (content: string) => {
       const id = await createConversation({
@@ -100,6 +142,17 @@ export function ChatView({ conv }: { conv: Conversation }) {
                 onRestart={() => void restart(m.content)}
                 onDelete={async () => { await db.messages.delete(m.id); await deleteMessagesFrom(conv.id, m.createdAt) }}
               />
+            ) : m.image ? (
+              <ImageMessage
+                key={m.id}
+                message={m}
+                faded={!!m.folded}
+                showStats={settings.showStats}
+                canRegenerate={!busy}
+                disabled={busy}
+                onRegenerate={() => regenerateImage(m.image!)}
+                onDelete={() => void dropMessage(m.id, m.image?.blobId)}
+              />
             ) : (
               <AssistantMessage
                 key={m.id}
@@ -123,9 +176,23 @@ export function ChatView({ conv }: { conv: Conversation }) {
           )}
 
           {awaitingAnswer && !compacting && (
-            <SpinButton
-              icon={RefreshCw} variant="soft" size="md" label="Générer la réponse"
-              onClick={() => void regenerate(conv.id)}
+            awaitingImage ? (
+              <SpinButton
+                icon={RefreshCw} variant="soft" size="md" label="Reprendre la génération de l’image"
+                onClick={() => void generate(conv.id, pending!.content, awaitingImage, { resume: true })}
+              />
+            ) : (
+              <SpinButton
+                icon={RefreshCw} variant="soft" size="md" label="Générer la réponse"
+                onClick={() => void regenerate(conv.id)}
+              />
+            )
+          )}
+          {job && (
+            <GeneratingImage
+              job={job}
+              onCancel={() => cancelImage(conv.id)}
+              onRevealed={() => void finishImage(conv.id)}
             />
           )}
           {stream && (
@@ -190,10 +257,12 @@ export function ChatView({ conv }: { conv: Conversation }) {
           conversation={conv}
           settings={settings}
           streaming={streaming}
+          generating={!!job}
           usedTokens={usedTokens}
           hasMemory={!!conv.memory.trim()}
           onSend={onSend}
-          onStop={() => stop(conv.id)}
+          onGenerate={onGenerate}
+          onStop={() => (job ? cancelImage(conv.id) : stop(conv.id))}
         />
       </div>
     </div>

@@ -42,7 +42,11 @@ export function formatNs(ns?: number): string {
 
 export function formatMs(ms?: number): string {
   if (ms === undefined) return '—'
-  return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(2)} s`
+  if (ms < 1000) return `${Math.round(ms)} ms`
+  // Au-delà de la minute, le centième de seconde n'apprend plus rien.
+  if (ms < 60_000) return `${(ms / 1000).toFixed(2)} s`
+  const total = Math.round(ms / 1000)
+  return `${Math.floor(total / 60)} min ${String(total % 60).padStart(2, '0')} s`
 }
 
 const RTF = new Intl.RelativeTimeFormat('fr', { numeric: 'auto' })

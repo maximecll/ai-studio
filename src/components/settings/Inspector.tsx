@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react'
 import { ChevronRight, Dices, Info, RotateCcw, Save, X } from 'lucide-react'
-import { DEFAULT_PARAMS, patchSettings, updateConversation } from '../../lib/db'
-import type { Conversation, Params } from '../../lib/types'
+import { DEFAULT_IMAGE_PARAMS, DEFAULT_PARAMS, imageParamsOf, patchSettings, updateConversation } from '../../lib/db'
+import type { Conversation, ImageParams, Params } from '../../lib/types'
 import { cn, formatBytes, formatNumber } from '../../lib/utils'
 import { estimateMemory, hasCapability, prettyModel } from '../../lib/ollama'
 import { findModel, useModels } from '../../store/models'
 import { toast, useUI } from '../../store/ui'
 import { useSettings, useSystemMemory } from '../../lib/hooks'
-import { Badge, Button, Field, Input, Slider, Switch, Textarea, Tooltip } from '../ui/primitives'
+import { Badge, Button, Dropdown, Field, Input, Slider, Switch, Textarea, Tooltip } from '../ui/primitives'
 import { SavePresetModal } from './SavePresetModal'
+import { DEFINITIONS, RATIOS, describeSize, dimensions, estimate, modelOf, roughly } from '../../lib/images'
+import { useImages } from '../../store/images'
 
 /**
  * Coût mémoire du contexte choisi. Le cache d'attention croît linéairement
@@ -64,6 +66,130 @@ function MemoryHint({
   )
 }
 
+/**
+ * Réglages de diffusion.
+ *
+ * Ils sont globaux, pas attachés à une conversation : on ne règle pas le
+ * guidage de FLUX comme on règle la température d'un modèle de langage — on
+ * le pose une fois et on n'y revient qu'en cas de besoin.
+ */
+function ImageSection({ params, onPatch }: { params: ImageParams; onPatch: (p: Partial<ImageParams>) => void }) {
+  const engine = useImages((s) => s.engine)
+  const refresh = useImages((s) => s.refresh)
+  const probing = useImages((s) => s.probing)
+
+  useEffect(() => { if (probing) void refresh() }, [probing, refresh])
+
+  const catalog = engine?.catalog ?? []
+  const installed = catalog.filter((m) => m.installed)
+  const model = modelOf(catalog, params.model)
+  const { ratio, def } = describeSize(params.width, params.height)
+  const steps = params.steps ?? model?.steps.default ?? 20
+
+  const set = onPatch
+
+  if (!engine?.ready || installed.length === 0) {
+    return (
+      <p className="text-[13px] text-fg-subtle">
+        Aucun modèle d'images installé. Rendez-vous dans « Modèles » pour en télécharger un.
+      </p>
+    )
+  }
+
+  return (
+    <>
+      <Field label="Modèle">
+        <Dropdown
+          value={params.model}
+          onChange={(v) => set({ model: v, steps: undefined, guidance: undefined })}
+          options={installed.map((m) => ({ value: m.id, label: `${m.name} · ${m.variant}`, hint: m.note }))}
+        />
+      </Field>
+
+      <Field label="Format">
+        <Dropdown
+          value={ratio.id}
+          onChange={(v) => {
+            const r = RATIOS.find((x) => x.id === v)
+            if (r) set(dimensions(r, def))
+          }}
+          options={RATIOS.map((r) => ({ value: r.id, label: r.label, hint: r.hint }))}
+        />
+      </Field>
+
+      <Field
+        label="Définition"
+        hint={`${params.width} × ${params.height} — environ ${roughly(estimate(steps, params.width, params.height, model?.msPerStep768, model?.loadMs))} par image sur cette machine.`}
+      >
+        <Dropdown
+          value={def.id}
+          onChange={(v) => {
+            const d = DEFINITIONS.find((x) => x.id === v)
+            if (d) set(dimensions(ratio, d))
+          }}
+          options={DEFINITIONS.map((d) => {
+            const size = dimensions(ratio, d)
+            return { value: d.id, label: d.label, hint: `${size.width} × ${size.height} — ${d.note}` }
+          })}
+        />
+      </Field>
+
+      {model && (
+        <Slider
+          label="Pas de débruitage"
+          value={params.steps}
+          defaultValue={model.steps.default}
+          min={model.steps.min}
+          max={model.steps.max}
+          step={1}
+          onChange={(v) => set({ steps: v })}
+          hint="Chaque pas affine l'image. Au-delà d'une vingtaine, le gain devient difficile à voir — le temps, lui, continue de monter."
+        />
+      )}
+
+      {model?.guidance && (
+        <Slider
+          label="Guidage"
+          value={params.guidance}
+          defaultValue={model.guidance.default}
+          min={model.guidance.min}
+          max={model.guidance.max}
+          step={0.1}
+          onChange={(v) => set({ guidance: v })}
+          format={(v) => v.toFixed(1)}
+          hint="Fidélité à la description. Trop haut, l'image se rigidifie ; trop bas, elle dérive."
+        />
+      )}
+
+      {model && !model.guidance && (
+        <p className="text-[12px] leading-snug text-fg-subtle">
+          Ce modèle est distillé : il n'a pas de branche de guidage, le réglage n'aurait aucun effet.
+        </p>
+      )}
+
+      <Field
+        label="Graine"
+        hint="Vide, elle est tirée au hasard à chaque image. Fixée, la même description redonne exactement la même image."
+        action={
+          <Tooltip label="Tirer une graine au hasard">
+            <Button size="icon-sm" onClick={() => set({ seed: Math.floor(Math.random() * 2 ** 31) })}>
+              <Dices size={16} />
+            </Button>
+          </Tooltip>
+        }
+      >
+        <Input
+          type="number"
+          min={0}
+          value={params.seed ?? ''}
+          placeholder="Aléatoire"
+          onChange={(e) => set({ seed: e.target.value === '' ? null : Math.max(0, Number(e.target.value)) })}
+        />
+      </Field>
+    </>
+  )
+}
+
 function Section({
   title, children, defaultOpen = true, hint,
 }: { title: string; children: React.ReactNode; defaultOpen?: boolean; hint?: string }) {
@@ -88,6 +214,8 @@ export interface InspectorTarget {
   system: string
   params: Params
   think?: boolean
+  /** Réglages de diffusion de la même cible — conversation, ou valeurs par défaut. */
+  imageParams?: ImageParams
 }
 
 function Inspector({
@@ -254,6 +382,19 @@ function Inspector({
           )}
         </Section>
 
+        <Section
+          title="Image"
+          defaultOpen={false}
+          hint="Réglages de la génération d'images par diffusion. Ils sont communs à toutes les conversations."
+        >
+          <ImageSection
+            params={target.imageParams ?? DEFAULT_IMAGE_PARAMS}
+            onPatch={(patch) =>
+              onPatch({ imageParams: { ...(target.imageParams ?? DEFAULT_IMAGE_PARAMS), ...patch } })
+            }
+          />
+        </Section>
+
         <Section title="Modèle" defaultOpen={false}>
           {model ? (
             <>
@@ -294,10 +435,11 @@ function Inspector({
 
 /** Panneau branché sur une conversation existante. */
 export function ConversationInspector({ conv }: { conv: Conversation }) {
+  const settings = useSettings()
   return (
     <Inspector
       heading="Paramètres"
-      target={conv}
+      target={{ ...conv, imageParams: imageParamsOf(conv, settings) }}
       onPatch={(patch) => void updateConversation(conv.id, { ...patch, presetId: null })}
       footer={
         <div className="p-5">
@@ -330,11 +472,17 @@ export function DefaultsInspector() {
   return (
     <Inspector
       heading="Paramètres par défaut"
-      target={{ model: settings.defaultModel, system: settings.defaultSystem, params: settings.defaultParams }}
+      target={{
+        model: settings.defaultModel,
+        system: settings.defaultSystem,
+        params: settings.defaultParams,
+        imageParams: settings.imageParams,
+      }}
       onPatch={(patch) =>
         void patchSettings({
           ...(patch.params ? { defaultParams: patch.params } : {}),
           ...(patch.system !== undefined ? { defaultSystem: patch.system } : {}),
+          ...(patch.imageParams ? { imageParams: patch.imageParams } : {}),
         })
       }
       footer={

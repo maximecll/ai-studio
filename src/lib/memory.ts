@@ -1,4 +1,4 @@
-import { ollama } from './ollama'
+import { CONTEXT_CAP, ollama } from './ollama'
 import type { Conversation, Message } from './types'
 import { estimateTokens } from './utils'
 
@@ -118,16 +118,36 @@ export function contextUsage(conv: Conversation, messages: Message[]): number {
 }
 
 /** Demande au modèle le mémo fusionné. Renvoie le mémo précédent en cas d'échec. */
+/** Jetons réservés à la réécriture elle-même. */
+const MEMO_PREDICT = 700
+
 export async function rewriteMemory(
   model: string,
   memo: string,
   older: Message[],
   signal?: AbortSignal,
+  /** Fenêtre de la conversation : le compactage doit tenir dans la même. */
+  numCtx?: number,
 ): Promise<string> {
+  const prompt = buildPrompt(memo || emptyMemory(), older)
+
+  /**
+   * Sans fenêtre explicite, Ollama charge le modèle avec sa valeur par défaut
+   * — 4096 — et tronque tout ce qui dépasse, en n'en avertissant que dans son
+   * propre journal. Le compactage résumait alors moins de la moitié de ce
+   * qu'on lui confiait, et détruisait le reste en repliant les messages.
+   *
+   * On dimensionne donc la fenêtre sur le prompt réellement construit, sans
+   * jamais descendre sous celle de la conversation ni dépasser le plafond
+   * tenable par la machine.
+   */
+  const needed = estimateTokens(prompt) + MEMO_PREDICT + 512
+  const window = Math.min(CONTEXT_CAP, Math.max(numCtx ?? 0, needed))
+
   const raw = await ollama.generate(
     model,
-    buildPrompt(memo || emptyMemory(), older),
-    { temperature: 0.2, top_p: 0.9, num_predict: 700 },
+    prompt,
+    { temperature: 0.2, top_p: 0.9, num_predict: MEMO_PREDICT, num_ctx: window },
     signal,
   )
   return sanitize(raw, memo || emptyMemory())

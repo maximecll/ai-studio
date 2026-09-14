@@ -166,6 +166,34 @@ export async function openText(master: CryptoKey, payload: string): Promise<stri
   return dec.decode(await unseal(master, payload))
 }
 
+/* ── Chiffrement des pièces binaires ──────────────────────────────── */
+
+/**
+ * Une image pèse un million de fois un titre : la passer en base64 comme le
+ * texte gonflerait la base d'un tiers pour rien. Les octets restent donc des
+ * octets, et le vecteur d'initialisation voyage à côté, dans sa propre colonne.
+ */
+export interface SealedBytes {
+  iv: string
+  data: Uint8Array
+}
+
+export async function sealBytes(master: CryptoKey, bytes: Uint8Array): Promise<SealedBytes> {
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, master, bytes as BufferSource)
+  return { iv: toBase64(iv), data: new Uint8Array(ct) }
+}
+
+export async function openBytes(master: CryptoKey, sealed: SealedBytes): Promise<Uint8Array> {
+  const iv = fromBase64(sealed.iv) as unknown as BufferSource
+  try {
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, master, sealed.data.slice().buffer)
+    return new Uint8Array(pt)
+  } catch {
+    throw new VaultError('Image indéchiffrable : clé incorrecte ou donnée altérée.')
+  }
+}
+
 /** Le chiffrement exige WebCrypto, donc un contexte sécurisé. */
 export const cryptoAvailable =
   typeof window !== 'undefined' && window.isSecureContext && !!globalThis.crypto?.subtle

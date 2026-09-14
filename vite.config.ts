@@ -6,9 +6,10 @@ import tailwindcss from '@tailwindcss/vite'
 const OLLAMA = process.env.OLLAMA_HOST ?? 'http://127.0.0.1:11434'
 
 /**
- * L'entretien du magasin Ollama touche au système de fichiers : il vit côté
- * serveur. Ce greffon monte le même gestionnaire qu'en production, pour que
- * le comportement soit identique en développement.
+ * L'entretien du magasin Ollama et la génération d'images touchent au système
+ * de fichiers : ils vivent côté serveur. Ce greffon monte les mêmes
+ * gestionnaires qu'en production, pour que le comportement soit identique en
+ * développement.
  */
 function maintenance(): PluginOption {
   return {
@@ -22,6 +23,12 @@ function maintenance(): PluginOption {
       server.middlewares.use('/maintenance/memory', async (req, res) => {
         // @ts-expect-error — module serveur en JavaScript, sans types
         const { handle } = await import('./server/system.mjs')
+        await handle(req, res)
+      })
+      // La génération d'images sort d'Ollama : elle pilote un processus Python.
+      server.middlewares.use('/images', async (req, res) => {
+        // @ts-expect-error — module serveur en JavaScript, sans types
+        const { handle } = await import('./server/images.mjs')
         await handle(req, res)
       })
     },

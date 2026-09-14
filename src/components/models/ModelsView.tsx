@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import {
-  ArrowLeft, Boxes, Brain, Eye, HardDrive, MessageSquare,
+  ArrowLeft, Boxes, Brain, Cpu, Eye, HardDrive, MessageSquare,
   MessageSquarePlus, PowerOff, RefreshCw, Trash2, Wrench,
 } from 'lucide-react'
 import { createConversation } from '../../lib/db'
@@ -13,6 +13,7 @@ import { downloadFor, useDownloads } from '../../store/downloads'
 import { DownloadRow } from './DownloadRow'
 import { ModelBrowser } from './ModelBrowser'
 import { Maintenance } from './Maintenance'
+import { ImageEngine, LoraLibrary } from './ImageEngine'
 import { toast } from '../../store/ui'
 import { Badge, Button, ConfirmModal, Tooltip } from '../ui/primitives'
 import { href, navigate } from '../../lib/router'
@@ -180,6 +181,9 @@ export function ModelsView() {
 
   const totalSize = models.reduce((n, m) => n + m.size, 0)
   const vram = running.reduce((n, m) => n + (m.size_vram ?? 0), 0)
+  /* Chargé, mais pas une seule couche sur le GPU : le cas qui coûte cher et ne
+     se voit nulle part. */
+  const onCpu = running.filter((m) => (m.size ?? 0) > 0 && !(m.size_vram ?? 0))
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-bg">
@@ -205,6 +209,33 @@ export function ModelsView() {
 
       <div className="min-h-0 flex-1 overflow-y-auto scroll-thin">
         <div className="mx-auto w-full max-w-5xl space-y-6 px-6 py-8">
+          {/* Un modèle chargé hors du GPU divise le débit par cinq, sans aucun
+              message. Ollama ne sonde le GPU qu'au démarrage du démon : si la
+              mémoire était saturée à ce moment-là, il reste sur le processeur
+              jusqu'à ce qu'on le relance. Autant le dire franchement. */}
+          {onCpu.length > 0 && (
+            <div className="flex items-start gap-3 rounded-lg bg-caution-wash p-6">
+              <Cpu size={16} className="mt-0.5 shrink-0 text-caution" />
+              <div className="min-w-0">
+                <p className="text-[15px] font-bold text-caution">
+                  {onCpu.length > 1 ? 'Des modèles tournent' : 'Un modèle tourne'} sur le processeur
+                </p>
+                <p className="mt-1 text-[14px] text-fg-muted">
+                  {onCpu.map((m) => prettyModel(m.name)).join(', ')} — aucune couche sur le GPU.
+                  Le débit est environ cinq fois plus faible qu'il ne devrait l'être.
+                </p>
+                <p className="mt-2 text-[14px] text-fg-muted">
+                  Ollama ne cherche le GPU qu'au démarrage de son service. Si la mémoire était
+                  saturée à cet instant, la recherche échoue et il reste sur le processeur
+                  jusqu'au prochain redémarrage. Fermez ce qui occupe la mémoire, puis relancez Ollama.
+                </p>
+                <p className="mt-2 rounded-sm bg-surface px-3 py-2 font-mono text-[13px] text-fg-muted">
+                  pkill ollama &amp;&amp; ollama serve
+                </p>
+              </div>
+            </div>
+          )}
+
           {status === 'offline' && (
             <div className="flex items-start gap-3 rounded-lg border border-danger/25 bg-negative-wash p-6">
               <HardDrive size={16} className="mt-0.5 shrink-0 text-danger" />
@@ -226,6 +257,10 @@ export function ModelsView() {
               ))}
             </div>
           )}
+
+          <ImageEngine />
+
+          <LoraLibrary />
 
           <Maintenance />
 

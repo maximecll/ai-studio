@@ -45,11 +45,91 @@ export interface GenStats {
   }
 }
 
+/** Un LoRA retenu, avec son dosage. Le fichier est la clé : la bibliothèque est un dossier. */
+export interface LoraChoice {
+  file: string
+  /** 0 = sans effet, 1 = tel qu'entraîné. Au-delà, l'image se rigidifie. */
+  scale: number
+}
+
+/** Un fichier de la bibliothèque, tel que le serveur le décrit. */
+export interface LoraFile {
+  file: string
+  name: string
+  bytes: number
+  /**
+   * Architecture déclarée dans les métadonnées. Indicative seulement : les
+   * outils d'entraînement y écrivent régulièrement n'importe quoi.
+   */
+  architecture?: string
+  /** Famille déduite des noms de tenseurs — fiable, c'est là-dessus qu'on tranche. */
+  target?: string
+  /** Largeur du modèle visé : ce qui sépare deux tailles d'une même famille. */
+  width?: number
+  /** Rang de l'adaptateur : sa capacité, et son poids. */
+  rank?: number
+  /** Mot déclencheur à placer dans la description, quand l'auteur en a prévu un. */
+  trigger?: string
+  /**
+   * Expert visé sur un modèle à double transformeur : « high » pour le bruit
+   * élevé, « low » pour le bruit faible. Les LoRAs Wan A14B vont par paires.
+   */
+  expert?: 'high' | 'low'
+}
+
+/**
+ * Réglages de diffusion. Sans rapport avec `Params`, qui pilote un modèle de
+ * langage : la génération d'images n'a ni température ni contexte.
+ */
+export interface ImageParams {
+  /** Identifiant du catalogue servi par `/images/status`. */
+  model: string
+  width: number
+  height: number
+  /** Pas de débruitage. Plus il y en a, plus l'image se précise — et se paie. */
+  steps?: number
+  /** Fidélité à la description. Sans effet sur schnell, qui n'a pas de branche de guidage. */
+  guidance?: number
+  /** Graine fixée à la main, pour reproduire une image à l'identique. */
+  seed?: number | null
+  /** LoRAs actifs. Liste vide ou absente : le modèle travaille seul. */
+  loras?: LoraChoice[]
+}
+
+/** Ce qu'on garde d'une image produite. Les octets, eux, vivent dans `db.images`. */
+export interface ImageMeta {
+  /** Clé de la ligne portant les octets, dans la table `images`. */
+  blobId: string
+  prompt: string
+  /** Identifiant du catalogue, et son libellé au moment de la génération. */
+  model: string
+  modelName: string
+  width: number
+  height: number
+  steps: number
+  seed: number
+  guidance?: number
+  /** LoRAs appliqués — avec la graine, c'est ce qui rend l'image reproductible. */
+  loras?: LoraChoice[]
+  /** Durée totale, chargement du modèle compris. */
+  ms: number
+  bytes: number
+}
+
 export interface Message {
   id: string
   conversationId: string
   role: Role
   content: string
+  /** Image produite par diffusion — le message porte alors l'image, pas du texte. */
+  image?: ImageMeta
+  /**
+   * Réglages avec lesquels ce message a été envoyé au moteur de diffusion.
+   * Présent sur le message de l'utilisateur, et seulement en mode image : il
+   * permet de relancer la génération à l'identique si elle a été interrompue —
+   * un rechargement de page pendant sept minutes d'attente, par exemple.
+   */
+  imageRequest?: ImageParams
   /** Raisonnement séparé, pour les modèles « thinking ». */
   thinking?: string
   createdAt: number
@@ -58,6 +138,23 @@ export interface Message {
   error?: string
   /** Replié dans la mémoire : conservé et lisible, mais plus transmis au modèle. */
   folded?: 0 | 1
+}
+
+/**
+ * Octets d'une image, rangés à part des messages.
+ *
+ * Séparer la pièce lourde de sa fiche garde les listes de messages légères :
+ * Dexie ne charge les mégaoctets que lorsqu'une image est réellement affichée.
+ */
+export interface ImageBlob {
+  id: string
+  conversationId: string
+  /** Chiffré si la conversation est verrouillée — d'où `iv`. */
+  data: Blob
+  sealed: 0 | 1
+  iv?: string
+  type: string
+  createdAt: number
 }
 
 /** Mode d'affichage de la transcription. */
@@ -80,6 +177,12 @@ export interface Conversation {
   transcript: Transcript
   /** Contenus chiffrés au repos, illisibles coffre fermé. */
   locked: 0 | 1
+  /**
+   * Réglages de diffusion propres à cette conversation — modèle, format, LoRAs.
+   * Absent sur les conversations créées avant leur existence : on retombe alors
+   * sur les valeurs par défaut.
+   */
+  imageParams?: ImageParams
   /** Mémo Markdown alimenté au fil de la conversation. */
   memory: string
   memoryUpdatedAt: number | null
@@ -132,7 +235,67 @@ export interface Settings {
   defaultTranscript: Transcript
   /** Durée de maintien du modèle en mémoire (format Ollama : « 5m », « 1h », « 0 »). */
   keepAlive: string
+  /** Réglages de diffusion dont héritent les nouvelles conversations. */
+  imageParams: ImageParams
   density: 'cosy' | 'compact'
+}
+
+/* ── Moteur d'images (cf. server/images.mjs) ──────────────────────── */
+
+export interface ImageModel {
+  id: string
+  /** Famille d'architecture : décide de la classe employée, et des LoRAs compatibles. */
+  family: string
+  /** Moteur qui l'exécute — mflux, ou mlx-video pour les modèles vidéo. */
+  runner: 'mflux' | 'mlx-video'
+  name: string
+  /** Niveau de quantification, tel qu'affiché à côté du nom. */
+  variant: string
+  repo: string
+  base: string
+  bytes: number
+  steps: { default: number; min: number; max: number }
+  /** Nul pour les modèles distillés, qui ignorent le guidage. */
+  guidance: { default: number; min: number; max: number } | null
+  /** Coût d'un pas à 768 × 768, en millisecondes. */
+  msPerStep768: number
+  /** Coût fixe par génération : chargement, encodage du texte, décodage final. */
+  loadMs: number
+  /** Famille de LoRAs acceptée, et largeur attendue de leurs matrices. */
+  loraTarget?: string
+  loraWidth?: number | null
+  /** Deux transformeurs experts : les adaptateurs vont par paires. */
+  dual?: boolean
+  /** Mémoire résidente nécessaire pendant la génération, en octets. */
+  needsRam?: number
+  /** Vrai quand ce coût a été chronométré ici, faux quand il est déduit de la taille. */
+  measured: boolean
+  note: string
+  recommended?: boolean
+  /** Trop lourd pour la mémoire de la machine : à signaler avant de télécharger. */
+  heavy?: boolean
+  installed?: boolean
+  onDisk?: number
+  /** Transfert en cours, repéré sur le disque même s'il vient d'ailleurs. */
+  downloading?: boolean
+  /** Des morceaux partiels, mais plus aucun mouvement : reprenable. */
+  partial?: boolean
+  /** Avancement, de 0 à 1, tant que le modèle n'est pas installé. */
+  progress?: number
+}
+
+export interface ImageEngine {
+  ready: boolean
+  busy: boolean
+  engine?: string
+  python?: string
+  cache?: string
+  free?: number
+  /** Cache de morceaux Xet : un second espace disque, indépendant des poids. */
+  xet?: number
+  venv: string
+  error?: string
+  catalog: ImageModel[]
 }
 
 /* ── Réponses de l'API Ollama ─────────────────────────────────────── */

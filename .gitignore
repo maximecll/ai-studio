@@ -8,6 +8,10 @@ dist/
 *.log
 .DS_Store
 
+# Moteur d'images : environnement Python dédié, reconstruit à la demande
+# depuis « Modèles » (≈ 2 Go de dépendances MLX).
+.venv-images/
+
 # Réglages locaux d'éditeur
 .vscode/
 .idea/

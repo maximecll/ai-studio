@@ -109,7 +109,9 @@ export const useChat = create<ChatState>((set, get) => {
           '',
           'Titre :',
         ].join('\n'),
-        { temperature: 0.3, top_p: 0.9, num_predict: 28 },
+        /* La fenêtre de la conversation, là encore : un titre de six mots ne
+           justifie pas de recharger le modèle avec une autre taille de contexte. */
+        { temperature: 0.3, top_p: 0.9, num_predict: 28, num_ctx: conv.params.num_ctx },
       )
       const title = splitThinking(raw).content
         .replace(/^["'«»\s]+|["'«».\s]+$/g, '')
@@ -137,7 +139,9 @@ export const useChat = create<ChatState>((set, get) => {
 
     set({ compacting: { ...get().compacting, [conversationId]: true } })
     try {
-      const memory = await rewriteMemory(conv.model, conv.memory, p.older)
+      /* La fenêtre de la conversation accompagne la demande : sans elle,
+         Ollama recharge le modèle à 4096 et tronque l'historique à résumer. */
+      const memory = await rewriteMemory(conv.model, conv.memory, p.older, undefined, conv.params.num_ctx)
       await db.transaction('rw', db.conversations, db.messages, async () => {
         await db.conversations.update(conversationId, { memory, memoryUpdatedAt: Date.now() })
         await db.messages.bulkUpdate(p.older.map((m) => ({ key: m.id, changes: { folded: 1 as const } })))

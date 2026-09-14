@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowUpRight, Check, ChevronDown, Circle, Clock, Send, SlidersHorizontal } from 'lucide-react'
+import { ArrowUpRight, Check, ChevronDown, Circle, Clock, Image as ImageIcon, Send, SlidersHorizontal } from 'lucide-react'
 import { createConversation, patchSettings, updateConversation } from '../../lib/db'
 import { useConversations, usePresets, useSettings } from '../../lib/hooks'
 import { PresetGlyph } from '../../lib/preset-icons'
@@ -10,6 +10,8 @@ import { cn, modKey, relativeTime } from '../../lib/utils'
 import { prettyModel, suggestedContext } from '../../lib/ollama'
 import { useModels } from '../../store/models'
 import { useChat } from '../../store/chat'
+import { useImages } from '../../store/images'
+import { ImageControls, ModeToggle, useImageEngine } from '../chat/ImageControls'
 import { useUI } from '../../store/ui'
 import { Button, Chip, Menu, MenuItem, MenuLabel, MorphButton, Tooltip } from '../ui/primitives'
 
@@ -18,6 +20,15 @@ const SUGGESTIONS = [
   'Relis et améliore ce texte',
   'Aide-moi à déboguer ce code',
   'Donne-moi dix idées sur…',
+]
+
+/* FLUX répond bien aux descriptions concrètes : un sujet, une lumière, un
+   cadrage. Ces amorces sont là pour donner le ton, pas pour être envoyées telles quelles. */
+const IMAGE_SUGGESTIONS = [
+  'Un atelier de menuiserie au petit matin, lumière rasante',
+  'Portrait au 85 mm, fond neutre, lumière douce de fenêtre',
+  'Affiche typographique suisse, deux couleurs, grain de papier',
+  'Paysage de montagne dans la brume, à l’aquarelle',
 ]
 
 /**
@@ -31,8 +42,13 @@ export function HomeView() {
   const conversations = useConversations() ?? []
   const models = useModels((s) => s.models)
   const send = useChat((s) => s.send)
+  const generate = useImages((s) => s.create)
+  const { engine } = useImageEngine()
+  const hasImageModel = (engine?.catalog ?? []).some((m) => m.installed)
 
   const [text, setText] = useState('')
+  const [mode, setMode] = useState<'text' | 'image'>('text')
+  const image = mode === 'image' && hasImageModel
   const [preset, setPreset] = useState<Preset | null>(null)
   const ref = useRef<HTMLTextAreaElement>(null)
   const { inspectorOpen, toggleInspector } = useUI()
@@ -47,7 +63,22 @@ export function HomeView() {
 
   const start = async (message: string) => {
     const body = message.trim()
-    if (!body || !model) return
+    if (!body) return
+
+    /* En mode image, la conversation naît aussi — mais son premier échange est
+       une description et une image, pas un tour de parole avec un modèle de
+       langage. Le modèle de texte reste celui par défaut, pour la suite. */
+    if (image) {
+      const id = await createConversation({ model, params: settings.defaultParams, system: settings.defaultSystem })
+      /* On arrive dans la conversation avec le composeur déjà en mode image :
+         on enchaîne rarement une image et une question. */
+      sessionStorage.setItem(`mode.${id}`, 'image')
+      navigate(href.conversation(id))
+      void generate(id, body, settings.imageParams)
+      return
+    }
+
+    if (!model) return
     const chosen = models.find((m) => m.name === model)
     /* Un contexte réglé à la main prime ; sinon on l'ajuste au modèle. */
     const params = {
@@ -111,11 +142,21 @@ export function HomeView() {
                 }
               }}
               rows={1}
-              placeholder="Écrivez votre premier message…"
+              placeholder={image ? 'Décrivez l’image à produire…' : 'Écrivez votre premier message…'}
               className="t-body block max-h-[40vh] min-h-14 w-full resize-none bg-transparent px-5 pt-4 pb-1 text-fg outline-none scroll-thin placeholder:text-fg-subtle"
             />
             <div className="flex h-14 items-center gap-1.5 px-3">
               <div className="flex min-w-0 flex-1 items-center gap-1.5">
+              <ModeToggle mode={mode} onChange={setMode} ready={hasImageModel} />
+              {image ? (
+                <ImageControls
+                  params={settings.imageParams}
+                  onPatch={(patch) =>
+                    void patchSettings({ imageParams: { ...settings.imageParams, ...patch } })
+                  }
+                />
+              ) : (
+                <>
               <Menu
                 side="top" width="w-80"
                 trigger={({ open }) => (
@@ -161,14 +202,19 @@ export function HomeView() {
                   </MenuItem>
                 ))}
               </Menu>
-
+                </>
+              )}
               </div>
               <div className="shrink-0">
                 <MorphButton
-                  idle={Send} hover={Check} variant="primary" size="icon"
-                  iconClassName="translate-x-px -translate-y-px"
-                  title={settings.sendOnEnter ? 'Envoyer (Entrée)' : `Envoyer (${modKey}+Entrée)`}
-                  disabled={!text.trim() || !model}
+                  idle={image ? ImageIcon : Send} hover={Check} variant="primary" size="icon"
+                  iconClassName={image ? undefined : 'translate-x-px -translate-y-px'}
+                  title={
+                    image
+                      ? 'Produire l’image'
+                      : settings.sendOnEnter ? 'Envoyer (Entrée)' : `Envoyer (${modKey}+Entrée)`
+                  }
+                  disabled={!text.trim() || (!image && !model)}
                   onClick={() => void start(text)}
                 />
               </div>
@@ -176,7 +222,7 @@ export function HomeView() {
           </div>
 
           <div className="mt-6 flex flex-wrap gap-2">
-            {SUGGESTIONS.map((s, i) => (
+            {(image ? IMAGE_SUGGESTIONS : SUGGESTIONS).map((s, i) => (
               <motion.button
                 key={s}
                 initial={{ opacity: 0, y: 6 }}

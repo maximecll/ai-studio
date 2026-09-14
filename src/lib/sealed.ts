@@ -5,8 +5,8 @@
  * coffre. Les fonctions de lecture et d'écriture de `db.ts` traversent ce
  * module : c'est le seul point où du texte clair devient du chiffré.
  */
-import { isSealed, openText, sealText } from './crypto'
-import type { Conversation, Message } from './types'
+import { isSealed, openBytes, openText, sealBytes, sealText } from './crypto'
+import type { Conversation, ImageBlob, Message } from './types'
 
 let master: CryptoKey | null = null
 
@@ -61,6 +61,30 @@ export async function openMessage(msg: Message): Promise<Message> {
   if (!master) return msg
   if (!MSG_FIELDS.some((f) => isSealed(msg[f]))) return msg
   return map(msg, MSG_FIELDS, (v) => openText(master!, v))
+}
+
+/* ── Images ───────────────────────────────────────────────────────── */
+
+/**
+ * Les octets d'une image suivent la même règle que le texte : chiffrés dès
+ * que la conversation est verrouillée, et illisibles sans la clé maîtresse.
+ * Le vecteur d'initialisation est rangé à côté plutôt qu'en préfixe, pour
+ * que la donnée reste un Blob que le navigateur sait manipuler tel quel.
+ */
+export async function sealImage(bytes: Uint8Array, type: string, locked: boolean): Promise<Pick<ImageBlob, 'data' | 'sealed' | 'iv' | 'type'>> {
+  if (!locked || !master) {
+    return { data: new Blob([bytes as BlobPart], { type }), sealed: 0, type }
+  }
+  const { iv, data } = await sealBytes(master, bytes)
+  return { data: new Blob([data as BlobPart], { type: 'application/octet-stream' }), sealed: 1, iv, type }
+}
+
+/** Rend un Blob affichable, ou `null` si le coffre est fermé. */
+export async function openImage(row: ImageBlob): Promise<Blob | null> {
+  if (!row.sealed) return row.data
+  if (!master || !row.iv) return null
+  const bytes = await openBytes(master, { iv: row.iv, data: new Uint8Array(await row.data.arrayBuffer()) })
+  return new Blob([bytes as BlobPart], { type: row.type })
 }
 
 /** Vrai si le contenu est illisible en l'état — coffre fermé. */

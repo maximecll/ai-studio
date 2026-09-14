@@ -1,8 +1,8 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Conversation, Folder, Message, Params, Preset, Settings } from './types'
+import type { Conversation, Folder, ImageBlob, ImageParams, Message, Params, Preset, Settings } from './types'
 import type { Vault } from './crypto'
 import { fullDate, uid } from './utils'
-import { hasMaster, openConversation, openMessage, sealConversation, sealMessage } from './sealed'
+import { hasMaster, openConversation, openImage, openMessage, sealConversation, sealImage, sealMessage } from './sealed'
 import { isSealed } from './crypto'
 
 class StudioDB extends Dexie {
@@ -12,6 +12,7 @@ class StudioDB extends Dexie {
   folders!: EntityTable<Folder, 'id'>
   settings!: EntityTable<Settings, 'id'>
   vault!: EntityTable<Vault, 'id'>
+  images!: EntityTable<ImageBlob, 'id'>
 
   constructor() {
     super('ollama-studio')
@@ -62,6 +63,37 @@ class StudioDB extends Dexie {
           c.locked ??= 0
         }),
       )
+
+    /* v5 : les images produites par diffusion. Les octets vivent dans leur
+       propre table — un message reste une fiche légère, et Dexie ne charge
+       les mégaoctets que lorsqu'une image est réellement affichée. */
+    this.version(5).stores({
+      conversations: 'id, updatedAt, createdAt, pinned, folderId, archived, locked, *tags',
+      messages: 'id, conversationId, createdAt, [conversationId+createdAt]',
+      presets: 'id, name, createdAt',
+      folders: 'id, order, name',
+      settings: 'id',
+      vault: 'id',
+      images: 'id, conversationId, createdAt',
+    })
+
+    /* v6 : les réglages de diffusion descendent au niveau de la conversation,
+       comme ceux du modèle de langage. Les conversations existantes restent à
+       `undefined` et suivent les valeurs par défaut — aucune migration de
+       données n'est nécessaire, seulement une résolution à la lecture. */
+    this.version(6)
+
+    /* v7 : « Jamais » libérer la mémoire se retourne contre l'utilisateur.
+       Ollama décide au chargement combien de couches partent sur le GPU ; si la
+       mémoire était saturée à cet instant, il n'en met aucune. Un modèle qui ne
+       se décharge jamais fige cette décision pour de bon, et tout tourne cinq
+       fois plus lentement sans le moindre message. Une heure garde le modèle
+       chaud sur toute une session de travail, sans le piège. */
+    this.version(7).upgrade((tx) =>
+      tx.table('settings').toCollection().modify((s: Record<string, unknown>) => {
+        if (s.keepAlive === '-1') s.keepAlive = '1h'
+      }),
+    )
   }
 }
 
@@ -73,6 +105,14 @@ export const DEFAULT_PARAMS: Params = {
   top_k: 40,
   repeat_penalty: 1.1,
   num_ctx: 8192,
+}
+
+/** 1024 × 1024 est le format d'entraînement de FLUX : le meilleur rapport qualité/mémoire. */
+export const DEFAULT_IMAGE_PARAMS: ImageParams = {
+  model: 'flux-dev-4bit',
+  width: 1024,
+  height: 1024,
+  seed: null,
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -89,6 +129,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoCompact: true,
   defaultTranscript: 'normal',
   keepAlive: '10m',
+  imageParams: DEFAULT_IMAGE_PARAMS,
   density: 'cosy',
 }
 
@@ -169,8 +210,13 @@ async function doBootstrap(defaultModel: string): Promise<Settings> {
   return settings
 }
 
+/**
+ * Les réglages sont fusionnés sur les valeurs d'origine : une base créée avant
+ * l'ajout d'une option ne doit pas rendre ce champ indéfini à la lecture.
+ */
 export async function getSettings(): Promise<Settings> {
-  return (await db.settings.get('app')) ?? DEFAULT_SETTINGS
+  const stored = await db.settings.get('app')
+  return stored ? { ...DEFAULT_SETTINGS, ...stored } : DEFAULT_SETTINGS
 }
 
 export async function patchSettings(patch: Partial<Settings>): Promise<void> {
@@ -195,6 +241,9 @@ export async function createConversation(init: Partial<Conversation> = {}): Prom
     presetId: null,
     autoTitled: 0,
     transcript: s.defaultTranscript,
+    /* Figés à la création : changer le format par défaut ne doit pas modifier
+       rétroactivement les conversations déjà ouvertes. */
+    imageParams: { ...s.imageParams, loras: [...(s.imageParams.loras ?? [])] },
     locked: 0,
     memory: '',
     memoryUpdatedAt: null,
@@ -225,15 +274,17 @@ export async function getConversation(id: string): Promise<Conversation | undefi
 }
 
 export async function deleteConversation(id: string): Promise<void> {
-  await db.transaction('rw', db.conversations, db.messages, async () => {
+  await db.transaction('rw', db.conversations, db.messages, db.images, async () => {
     await db.messages.where('conversationId').equals(id).delete()
+    await db.images.where('conversationId').equals(id).delete()
     await db.conversations.delete(id)
   })
 }
 
 export async function deleteAllConversations(): Promise<void> {
-  await db.transaction('rw', db.conversations, db.messages, async () => {
+  await db.transaction('rw', db.conversations, db.messages, db.images, async () => {
     await db.messages.clear()
+    await db.images.clear()
     await db.conversations.clear()
   })
 }
@@ -244,11 +295,69 @@ export async function duplicateConversation(id: string): Promise<string | null> 
   const msgs = await messagesOf(id)
   const newId = uid()
   const now = Date.now()
-  await db.transaction('rw', db.conversations, db.messages, async () => {
+
+  /* Les images sont recopiées telles quelles, chiffrement compris : la copie
+     hérite de l'état de verrouillage de l'originale, donc de sa clé. Chaque
+     message repointe vers sa propre copie, sinon supprimer l'une viderait l'autre. */
+  const pictures = await db.images.where('conversationId').equals(id).toArray()
+  const reborn = new Map(pictures.map((p) => [p.id, uid()]))
+
+  await db.transaction('rw', db.conversations, db.messages, db.images, async () => {
     await db.conversations.add({ ...conv, id: newId, title: `${conv.title} (copie)`, createdAt: now, updatedAt: now })
-    await db.messages.bulkAdd(msgs.map((m) => ({ ...m, id: uid(), conversationId: newId })))
+    await db.images.bulkAdd(pictures.map((p) => ({ ...p, id: reborn.get(p.id)!, conversationId: newId })))
+    await db.messages.bulkAdd(
+      msgs.map((m) => ({
+        ...m,
+        id: uid(),
+        conversationId: newId,
+        ...(m.image ? { image: { ...m.image, blobId: reborn.get(m.image.blobId) ?? m.image.blobId } } : {}),
+      })),
+    )
   })
   return newId
+}
+
+/**
+ * Réglages de diffusion effectifs d'une conversation.
+ *
+ * Une conversation antérieure à leur existence n'en porte pas : elle suit alors
+ * les valeurs par défaut, plutôt que de se retrouver sans modèle d'images.
+ */
+export function imageParamsOf(conv: Conversation | null | undefined, settings: Settings): ImageParams {
+  return conv?.imageParams ?? settings.imageParams
+}
+
+/* ── Images ───────────────────────────────────────────────────────── */
+
+/** Range les octets d'une image, chiffrés si la conversation est verrouillée. */
+export async function putImage(conversationId: string, bytes: Uint8Array, type = 'image/png'): Promise<string> {
+  const id = uid()
+  const sealed = await sealImage(bytes, type, await isLocked(conversationId))
+  await db.images.add({ id, conversationId, createdAt: Date.now(), ...sealed })
+  return id
+}
+
+/** Rend le Blob affichable, ou `null` si absent ou si le coffre est fermé. */
+export async function readImage(id: string): Promise<Blob | null> {
+  const row = await db.images.get(id)
+  if (!row) return null
+  try {
+    return await openImage(row)
+  } catch {
+    return null
+  }
+}
+
+export async function deleteImage(id: string): Promise<void> {
+  await db.images.delete(id)
+}
+
+/** Octets occupés par les images — pour le panneau de stockage. */
+export async function imagesWeight(): Promise<{ count: number; bytes: number }> {
+  let bytes = 0
+  let count = 0
+  await db.images.each((row) => { count++; bytes += row.data.size })
+  return { count, bytes }
 }
 
 /** Lecture des messages, déchiffrés si le coffre est ouvert. */
@@ -280,7 +389,9 @@ export async function updateMessage(id: string, patch: Partial<Message>): Promis
   if (!existing) return
   const locked = await isLocked(existing.conversationId)
   const sealed = await sealMessage({ ...existing, ...patch } as Message, locked)
-  await db.messages.update(id, sealed)
+  /* `put` plutôt qu'`update` : on réécrit l'enregistrement entier, et le typage
+     d'un patch Dexie ne sait pas décrire les champs imbriqués d'un message. */
+  await db.messages.put(sealed)
 }
 
 export async function deleteMessage(id: string): Promise<void> {
@@ -311,9 +422,23 @@ export async function setConversationLocked(id: string, locked: boolean): Promis
   const nextConv: Conversation = { ...openConv, locked: locked ? 1 : 0, updatedAt: Date.now() }
   const nextMsgs = await Promise.all(plain.map((m) => sealMessage(m, locked)))
 
-  await db.transaction('rw', db.conversations, db.messages, async () => {
+  /* Les images suivent le même chemin que le texte : on les ramène en clair,
+     puis on les rescelle dans l'état voulu. Sans cela, verrouiller laisserait
+     les images lisibles — précisément la fuite signalée sur les réponses. */
+  const pictures = await db.images.where('conversationId').equals(id).toArray()
+  const nextPics = await Promise.all(
+    pictures.map(async (row) => {
+      const clear = await openImage(row)
+      if (!clear) return row // indéchiffrable : on n'y touche pas plutôt que de la perdre
+      const bytes = new Uint8Array(await clear.arrayBuffer())
+      return { ...row, ...(await sealImage(bytes, row.type, locked)) }
+    }),
+  )
+
+  await db.transaction('rw', db.conversations, db.messages, db.images, async () => {
     await db.conversations.put(await sealConversation(nextConv))
     await db.messages.bulkPut(nextMsgs)
+    await db.images.bulkPut(nextPics)
   })
 }
 
