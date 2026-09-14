@@ -365,7 +365,7 @@ Seul un contexte vierge y échappe. La note de relais que j'avais ajoutée a don
 - [ ] **Éprouver la mémoire sémantique sur une vraie conversation longue** — le
       mécanisme est écrit et branché, mais jamais vu tourner de bout en bout
       (le compactage exige un appel au modèle, lent sur la machine).
-- [ ] **DNS local `lab.cm-it.fr`** — bail statique, entrée DNS sur la box,
+- [ ] **DNS local `ai-studio.local`** — bail statique, entrée DNS sur la box,
       certificat `mkcert`. Marche à suivre écrite dans `deploy/RESEAU-LOCAL.md`,
       reste à exécuter. Sans HTTPS, pas de WebCrypto, donc pas de chiffrement.
 - [ ] **Agents de session** — `bash scripts/install-daemons.sh` pour qu'Ollama

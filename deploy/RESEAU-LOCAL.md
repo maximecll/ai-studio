@@ -1,4 +1,4 @@
-# Nom local : lab.cm-it.fr sur le réseau de la box
+# Nom local : ai-studio.local sur le réseau de la box
 
 ## Le point à régler en premier
 
@@ -33,33 +33,33 @@ launchctl setenv HOST 0.0.0.0    # puis relancer l'agent
 
 Sur la Livebox : **Réseau → DHCP → Baux statiques**, réserver l'adresse du Mac
 (par exemple `192.168.1.42`), puis **DNS local** (ou « Noms d'hôtes »), associer
-`lab.cm-it.fr` à cette adresse.
+`ai-studio.local` à cette adresse.
 
 Toutes les box ne proposent pas d'entrée DNS locale arbitraire. Si la vôtre s'y
 refuse, deux solutions :
 
 - un serveur DNS local sur le Mac (`dnsmasq` via Homebrew), la box le désignant
   comme résolveur ;
-- ou l'entrée `192.168.1.42  lab.cm-it.fr` dans le fichier `hosts` de chaque
+- ou l'entrée `192.168.1.42  ai-studio.local` dans le fichier `hosts` de chaque
   appareil — suffisant pour deux ou trois machines.
 
 ### 3. Certificat de confiance locale
 
-`cm-it.fr` étant un domaine que vous possédez, une autorité publique ne
+le domaine étant un domaine que vous possédez, une autorité publique ne
 délivrera pas de certificat pour une adresse privée. On crée donc une autorité
 locale, installée sur vos appareils :
 
 ```bash
 brew install mkcert nss
 mkcert -install                      # installe l'autorité dans le trousseau
-mkcert lab.cm-it.fr 192.168.1.42     # produit le certificat et sa clé
+mkcert ai-studio.local 192.168.1.42     # produit le certificat et sa clé
 ```
 
 Puis lancer le serveur en HTTPS :
 
 ```bash
-STUDIO_CERT=./lab.cm-it.fr.pem \
-STUDIO_KEY=./lab.cm-it.fr-key.pem \
+STUDIO_CERT=./ai-studio.local.pem \
+STUDIO_KEY=./ai-studio.local-key.pem \
 HOST=0.0.0.0 PORT=443 node server.mjs
 ```
 
@@ -70,7 +70,7 @@ Sur iPhone ou iPad, il faut transférer le fichier `rootCA.pem`
 ### 4. Vérifier
 
 ```bash
-curl -sI https://lab.cm-it.fr | head -1     # doit répondre 200
+curl -sI https://ai-studio.local | head -1     # doit répondre 200
 ```
 
 Dans le navigateur, la console doit donner `window.isSecureContext === true`.
@@ -83,7 +83,7 @@ privé, sans autorité à installer sur chaque appareil :
 
 ```bash
 brew install --cask tailscale
-tailscale cert lab.cm-it.fr
+tailscale cert ai-studio.local
 ```
 
 L'accès fonctionne alors depuis n'importe où, pas seulement à la maison, et

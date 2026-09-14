@@ -1,4 +1,4 @@
-# Tunnel Cloudflare — lab.cm-it.fr → serveur Studio local.
+# Tunnel Cloudflare — ai-studio.local → serveur Studio local.
 #
 # Aucun port n'est ouvert sur la box : c'est le Mac qui établit la connexion
 # sortante vers Cloudflare. Le certificat TLS est géré par Cloudflare.
@@ -7,12 +7,12 @@
 # en remplaçant <TUNNEL-UUID> par l'identifiant renvoyé à la création.
 
 tunnel: <TUNNEL-UUID>
-credentials-file: /Users/max/.cloudflared/<TUNNEL-UUID>.json
+credentials-file: ~/.cloudflared/<TUNNEL-UUID>.json
 
 ingress:
   # Le serveur de production (5300), jamais celui de développement (5273) :
   # ce dernier expose le rechargement à chaud et les sources.
-  - hostname: lab.cm-it.fr
+  - hostname: ai-studio.local
     service: http://127.0.0.1:5300
     originRequest:
       # Les réponses arrivent en flux : pas de mise en tampon.
@@ -20,7 +20,7 @@ ingress:
       noTLSVerify: false
       connectTimeout: 30s
       # Une génération peut durer plusieurs minutes sur un gros modèle.
-      httpHostHeader: lab.cm-it.fr
+      httpHostHeader: ai-studio.local
 
   # Tout le reste est refusé.
   - service: http_status:404

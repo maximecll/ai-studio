@@ -1,10 +1,10 @@
-# Exposer Studio sur lab.cm-it.fr
+# Exposer Studio sur ai-studio.local
 
 ## Avertissement, à lire avant de commencer
 
 Studio n'a **aucune authentification**. Le relais donne accès à l'API Ollama
 complète : lire toutes les conversations, dialoguer avec les modèles, mais
-aussi **en télécharger et en supprimer**. Publier `lab.cm-it.fr` sans portail
+aussi **en télécharger et en supprimer**. Publier `ai-studio.local` sans portail
 d'identité revient à laisser cette machine ouverte à quiconque devine le
 sous-domaine — et les sous-domaines se devinent (journaux de transparence des
 certificats, balayages automatisés).
@@ -24,13 +24,13 @@ brew install cloudflared
 cloudflared tunnel login
 ```
 
-Le navigateur s'ouvre : choisir la zone `cm-it.fr`.
+Le navigateur s'ouvre : choisir votre zone.
 
 ### 2. Créer le tunnel et la route DNS
 
 ```bash
 cloudflared tunnel create lab-studio
-cloudflared tunnel route dns lab-studio lab.cm-it.fr
+cloudflared tunnel route dns lab-studio ai-studio.local
 ```
 
 La première commande affiche un UUID et écrit
@@ -51,7 +51,7 @@ $EDITOR ~/.cloudflared/config.yml
 Dans le tableau de bord Cloudflare Zero Trust :
 
 1. **Access → Applications → Add an application → Self-hosted**
-2. Domaine : `lab.cm-it.fr`
+2. Domaine : `ai-studio.local`
 3. **Policy** : *Allow*, règle `Emails` → votre adresse
 4. Méthode de connexion : *One-time PIN* suffit (un code arrive par courriel)
 
@@ -76,7 +76,7 @@ cloudflared tunnel run lab-studio
 
 ```bash
 # Doit répondre 302 vers le portail Cloudflare Access, pas 200
-curl -sI https://lab.cm-it.fr | head -3
+curl -sI https://ai-studio.local | head -3
 ```
 
 Une réponse `200` signifie que la politique Access n'est pas appliquée :
@@ -89,7 +89,7 @@ plus sûr : la machine n'est jamais exposée publiquement.
 
 ```bash
 brew install --cask tailscale
-tailscale cert lab.cm-it.fr   # certificat pour le nom de domaine
+tailscale cert ai-studio.local   # certificat pour le nom de domaine
 ```
 
 L'application reste alors joignable depuis vos appareils connectés au réseau
