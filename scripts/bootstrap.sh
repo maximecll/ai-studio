@@ -116,7 +116,7 @@ fi
 # jour. Mieux vaut le dire au démarrage qu'après des mois de retard.
 if ! command -v git >/dev/null 2>&1; then
   note "git est introuvable — les mises à jour seront indisponibles."
-  note "Installez-le depuis https://git-scm.com/downloads, puis relancez."
+  note "Réglages → Mises à jour propose de l'installer depuis l'application."
 fi
 
 # ── 5 ── Serveur ──────────────────────────────────────────────────────

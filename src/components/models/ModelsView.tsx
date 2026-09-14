@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { createConversation } from '../../lib/db'
 import { modelOwner, ollama, prettyModel, suggestedContext } from '../../lib/ollama'
+import { gpuVerdict, TONE, useHardware } from '../../lib/hardware'
 import type { OllamaModel } from '../../lib/types'
 import { cn, formatBytes, formatNumber, relativeTime } from '../../lib/utils'
 import { useModels } from '../../store/models'
@@ -59,6 +60,17 @@ function ModelCard({ model, loaded }: { model: OllamaModel; loaded?: OllamaModel
   const [busy, setBusy] = useState(false)
   const owner = modelOwner(model.name)
 
+  /* Le verdict compare l'empreinte du modèle, au contexte que l'application
+     lui donnerait, à ce que la carte graphique peut réellement porter. */
+  const hardware = useHardware()
+  const shape = useModels((s) => s.shapes[model.name] ?? null)
+  const loadShape = useModels((s) => s.loadShape)
+  useEffect(() => { void loadShape(model.name) }, [model.name, loadShape])
+
+  const verdict = hardware
+    ? gpuVerdict(model.size, shape, suggestedContext(model), hardware.gpu, hardware.totalRam)
+    : null
+
   return (
     <article
       className={cn(
@@ -84,6 +96,11 @@ function ModelCard({ model, loaded }: { model: OllamaModel; loaded?: OllamaModel
 
       {/* Deux rangées de badges réservées : au-delà, la carte ne bouge plus. */}
       <div className="mt-4 flex min-h-14 flex-wrap content-start gap-1.5">
+        {verdict && (
+          <Tooltip label={verdict.tip} side="top">
+            <Badge tone={TONE[verdict.level]}>{verdict.label}</Badge>
+          </Tooltip>
+        )}
         {model.details?.parameter_size && <Badge>{model.details.parameter_size}</Badge>}
         {model.details?.quantization_level && model.details.quantization_level !== 'unknown' && (
           <Badge>{model.details.quantization_level}</Badge>
@@ -110,11 +127,23 @@ function ModelCard({ model, loaded }: { model: OllamaModel; loaded?: OllamaModel
             <dd className="font-mono tabular-nums">{formatNumber(model.details.context_length)}</dd>
           </div>
         )}
+        {verdict && (
+          <div className="flex justify-between">
+            <dt className="text-fg-subtle">Empreinte</dt>
+            <dd className="font-mono tabular-nums">≈ {formatBytes(verdict.need)}</dd>
+          </div>
+        )}
         <div className="flex justify-between">
           <dt className="text-fg-subtle">Ajouté</dt>
           <dd>{relativeTime(new Date(model.modified_at).getTime())}</dd>
         </div>
       </dl>
+
+      {verdict && verdict.level !== 'ok' && (
+        <p className={cn('mt-3 text-[12px] leading-snug', verdict.level === 'non' ? 'text-negative' : 'text-caution')}>
+          {verdict.detail}
+        </p>
+      )}
 
       <div className="h-5" />
 

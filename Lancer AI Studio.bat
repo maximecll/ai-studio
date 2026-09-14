@@ -91,13 +91,16 @@ if defined REBUILD (
 )
 
 rem ---- 4 ---- Git -----------------------------------------------------
+rem  Git portable recupere par l'application : il prime sur celui du systeme.
+if exist "%RUNTIME%\git\cmd\git.exe" set "PATH=%RUNTIME%\git\cmd;%PATH%"
+
 rem  Non bloquant : l'application tourne sans git, mais ne peut plus se
 rem  mettre a jour. Windows ne le fournit pas d'origine.
 git --version >nul 2>&1
 if errorlevel 1 (
   echo.
   echo   git est introuvable - les mises a jour seront indisponibles.
-  echo   Installez-le depuis https://git-scm.com/download/win, puis relancez.
+  echo   Installez-le depuis Reglages ^> Mises a jour, en un clic.
 )
 
 rem ---- 5 ---- Restes d'une session precedente -------------------------

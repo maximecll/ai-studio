@@ -35,6 +35,7 @@ const STALE_MS = 6 * 60 * 60 * 1000
 const MODELS = [
   {
     id: 'flux-dev-4bit',
+    platforms: ['darwin'],
     /* Pic mesuré sur cette machine. */
     needsRam: 8_200_000_000,
     family: 'flux',
@@ -58,6 +59,7 @@ const MODELS = [
   },
   {
     id: 'flux-schnell-4bit',
+    platforms: ['darwin'],
     /* Pic mesuré sur cette machine. */
     needsRam: 8_200_000_000,
     family: 'flux',
@@ -81,6 +83,7 @@ const MODELS = [
   },
   {
     id: 'z-image-turbo',
+    platforms: ['darwin'],
     /* Déduit du poids des fichiers. */
     needsRam: 6_500_000_000,
     family: 'z-image',
@@ -103,6 +106,7 @@ const MODELS = [
   },
   {
     id: 'flux2-klein-4b',
+    platforms: ['darwin'],
     /* Déduit du poids des fichiers. */
     needsRam: 5_200_000_000,
     family: 'flux2',
@@ -125,6 +129,7 @@ const MODELS = [
   },
   {
     id: 'krea-2-turbo',
+    platforms: ['darwin'],
     /* Déduit du poids des fichiers. */
     needsRam: 14_000_000_000,
     family: 'krea2',
@@ -147,6 +152,7 @@ const MODELS = [
   },
   {
     id: 'wan22-ti2v-5b',
+    platforms: ['darwin'],
     /* L'encodeur de texte de 11 Go est le poste le plus lourd ; il est libéré ensuite. */
     needsRam: 11_500_000_000,
     family: 'wan',
@@ -174,6 +180,7 @@ const MODELS = [
   },
   {
     id: 'wan22-t2v-a14b',
+    platforms: ['darwin'],
     /* Les deux experts de 7,8 Go restent chargés ensemble pendant tout le débruitage. */
     needsRam: 15_600_000_000,
     family: 'wan',
@@ -202,6 +209,7 @@ const MODELS = [
   },
   {
     id: 'flux-dev-8bit',
+    platforms: ['darwin'],
     /* Déduit du poids des fichiers. */
     needsRam: 14_000_000_000,
     family: 'flux',
@@ -225,6 +233,7 @@ const MODELS = [
   },
   {
     id: 'sdxl-turbo',
+    platforms: ['win32', 'linux', 'darwin'],
     /* Estimation : poids fp16 plus les tampons de débruitage. */
     needsRam: 8_000_000_000,
     family: 'sdxl',
@@ -250,6 +259,7 @@ const MODELS = [
   },
   {
     id: 'sdxl-base',
+    platforms: ['win32', 'linux', 'darwin'],
     /* Estimation : poids fp16 plus les tampons de débruitage. */
     needsRam: 8_000_000_000,
     family: 'sdxl',
@@ -273,6 +283,7 @@ const MODELS = [
   },
   {
     id: 'sd15',
+    platforms: ['win32', 'linux', 'darwin'],
     /* Estimation : poids fp16 plus les tampons de débruitage. */
     needsRam: 4_000_000_000,
     family: 'sd15',
@@ -294,8 +305,10 @@ const MODELS = [
   },
 ]
 
-/** Seuls les modèles que le moteur de cette machine sait charger. */
-export const CATALOG = MODELS.filter((m) => m.runner === RUNNER)
+/** Un modèle n'est proposé que si son système figure dans sa liste et que le
+    moteur de cette machine sait le charger : mflux sur puce Apple, diffusers
+    ailleurs, les mêmes trois modèles servant Windows et Linux. */
+export const CATALOG = MODELS.filter((m) => m.runner === RUNNER && m.platforms.includes(platform()))
 
 export const byId = (id) => CATALOG.find((m) => m.id === id)
 

@@ -6,6 +6,7 @@ rem jour : on le relance aussitot. Tout autre code arrete la boucle.
 
 cd /d "%~dp0.."
 if exist ".runtime\node\node.exe" set "PATH=%CD%\.runtime\node;%PATH%"
+if exist ".runtime\git\cmd\git.exe" set "PATH=%CD%\.runtime\git\cmd;%PATH%"
 set "AI_STUDIO_SUPERVISED=1"
 
 :boucle
