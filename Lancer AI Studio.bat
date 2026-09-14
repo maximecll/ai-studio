@@ -16,6 +16,7 @@ set "NODE_VERSION=22.12.0"
 set "RUNTIME=%CD%\.runtime"
 if "%PORT%"=="" set "PORT=5300"
 set "URL=http://127.0.0.1:%PORT%"
+set "AI_STUDIO_ROOT=%CD%"
 
 echo.
 echo   AI Studio
@@ -90,42 +91,39 @@ if errorlevel 1 (
   echo   Installez-le depuis https://git-scm.com/download/win, puis relancez.
 )
 
-rem ---- 5 ---- Serveur --------------------------------------------------
-rem  On retient le PID : a la fermeture, on n'arrete que ce serveur-la et
-rem  non tous les node.exe de la machine.
+rem ---- 5 ---- Restes d'une session precedente -------------------------
+rem  Un node ou un Ollama oublie verrouille .runtime : le dossier devient
+rem  alors impossible a supprimer. On balaie avant de repartir.
+call :nettoyer
+
+rem ---- 6 ---- Navigateur ------------------------------------------------
+rem  Ouvert des que le port repond, sans bloquer cette fenetre.
+start "" /b cmd /c "scripts\ouvrir.bat"
+
+rem ---- 7 ---- Serveur --------------------------------------------------
+rem  Au premier plan, dans CETTE fenetre : la fermer arrete le serveur et
+rem  Ollama avec lui. Aucun processus ne survit a la croix rouge.
 echo.
 echo   [ Demarrage du serveur ]
-rem  scripts\serveur.bat relance le serveur apres chaque mise a jour.
-set "SRVPID="
-for /f "delims=" %%p in ('powershell -NoProfile -Command "(Start-Process -FilePath 'scripts\serveur.bat' -PassThru -WindowStyle Hidden).Id" 2^>nul') do set "SRVPID=%%p"
-if not defined SRVPID start "" /b cmd /c "scripts\serveur.bat"
-
-rem  Attendre que le port reponde avant d'ouvrir le navigateur.
-set "PRET="
-for /l %%i in (1,1,60) do (
-  if not defined PRET (
-    curl -fsS --max-time 2 "%URL%" >nul 2>&1
-    if not errorlevel 1 set "PRET=1"
-    if not defined PRET ping -n 2 127.0.0.1 >nul
-  )
-)
-if not defined PRET goto :echec_serveur
-
-rem ---- 6 ---- Navigateur -----------------------------------------------
-echo   Ouverture de %URL%
-start "" "%URL%"
-
 echo.
-echo   AI Studio est ouvert dans votre navigateur.
+echo   %URL%
 echo.
 echo   Fermez cette fenetre pour arreter AI Studio.
 echo.
+call "scripts\serveur.bat"
+
+call :nettoyer
+echo.
+echo   AI Studio est arrete.
+echo.
 pause >nul
-if defined SRVPID (
-  taskkill /f /t /pid %SRVPID% >nul 2>&1
-) else (
-  taskkill /f /im node.exe >nul 2>&1
-)
+exit /b 0
+
+rem ---- Nettoyage -------------------------------------------------------
+:nettoyer
+rem  Ne vise que les processus lances depuis CE dossier : un Ollama installe
+rem  par ailleurs sur la machine n'est pas touche.
+powershell -NoProfile -Command "$d=[regex]::Escape($env:AI_STUDIO_ROOT); Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'ollama.exe' -or $_.Name -eq 'node.exe') -and ((($_.ExecutablePath) -and $_.ExecutablePath -match $d) -or (($_.CommandLine) -and $_.CommandLine -match $d)) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" >nul 2>&1
 exit /b 0
 
 rem ---- Erreurs ---------------------------------------------------------
@@ -156,11 +154,6 @@ goto :fin_erreur
 echo.
 echo   ECHEC : construction de l'interface.
 echo   Faites defiler vers le haut pour voir la cause.
-goto :fin_erreur
-
-:echec_serveur
-echo.
-echo   ECHEC : le serveur n'a pas demarre.
 goto :fin_erreur
 
 :fin_erreur

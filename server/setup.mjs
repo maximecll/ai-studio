@@ -1,5 +1,5 @@
 /** Installation d'Ollama et détection du matériel. */
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { createWriteStream, existsSync } from 'node:fs'
 import { chmod, mkdir, rm, stat } from 'node:fs/promises'
 import { arch, homedir, platform, totalmem } from 'node:os'
@@ -136,8 +136,11 @@ async function anyBinary() {
 
 function startOllama(bin) {
   if (started && started.exitCode === null) return started
-  started = spawn(bin, ['serve'], { stdio: 'ignore', detached: true, windowsHide: true })
-  started.unref()
+  // Sous Windows, laisser Ollama rattache a notre console : sa fermeture
+  // emporte alors le moteur et ses runners, qui verrouillent .runtime.
+  const detached = platform() !== 'win32'
+  started = spawn(bin, ['serve'], { stdio: 'ignore', detached, windowsHide: true })
+  if (detached) started.unref()
   return started
 }
 
@@ -162,7 +165,9 @@ export async function ensureOllama() {
 export function stopOllama() {
   if (!started || started.exitCode !== null) return
   try {
-    if (platform() === 'win32') started.kill()
+    // Ollama se relance lui-meme comme « runner » : tuer le seul parent
+    // laisserait un processus fils sur les fichiers du modele.
+    if (platform() === 'win32') spawnSync('taskkill', ['/f', '/t', '/pid', String(started.pid)], { windowsHide: true })
     else process.kill(-started.pid)
   } catch { /* déjà parti */ }
   started = null

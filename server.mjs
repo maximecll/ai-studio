@@ -145,7 +145,7 @@ server.listen(PORT, HOST, async () => {
   if (etat === 'muet') console.warn("Ollama a été lancé mais ne répond pas sur le port 11434.")
 })
 
-for (const signal of ['exit', 'SIGINT', 'SIGTERM']) {
+for (const signal of ['exit', 'SIGHUP', 'SIGINT', 'SIGTERM']) {
   process.on(signal, () => {
     stopOllama()
     if (signal !== 'exit') process.exit(0)

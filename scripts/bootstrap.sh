@@ -140,7 +140,9 @@ else
   SERVER=$!
   set +m
   # Le serveur meurt avec cette fenêtre : fermer la fenêtre arrête tout.
-  trap 'kill -- -"$SERVER" 2>/dev/null; kill "$SERVER" 2>/dev/null; exit 0' EXIT INT TERM
+  # HUP compris : fermer la fenêtre du terminal envoie ce signal-là, et sans
+  # lui le serveur et Ollama survivaient à la fermeture.
+  trap 'kill -- -"$SERVER" 2>/dev/null; kill "$SERVER" 2>/dev/null; exit 0' EXIT HUP INT QUIT TERM
   for _ in $(seq 1 60); do listening && break; sleep 0.5; done
   listening || die "Le serveur n'a pas démarré."
 fi
