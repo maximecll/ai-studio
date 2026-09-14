@@ -1,20 +1,29 @@
-# Studio — interface locale pour Ollama
+# AI Studio
 
-Une interface privée pour discuter avec vos modèles Ollama : conversations
-persistantes, réglages d'inférence complets, gestion des modèles.
-Tout reste sur la machine — aucune donnée ne sort du navigateur.
+Une interface privée pour vos modèles locaux : conversations persistantes,
+réglages d'inférence complets, bibliothèque de modèles, génération d'images.
+Tout reste sur la machine — aucune donnée ne sort du navigateur, et ça
+fonctionne sans connexion.
 
 ## Démarrer
 
-Double-cliquez sur **Studio.app** (dans `~/Applications`). Il démarre Ollama,
-construit l'interface si nécessaire, lance le serveur local et ouvre
-l'application dans une fenêtre dédiée.
+Clonez le dépôt, puis double-cliquez sur le lanceur de votre système :
 
-Pour (re)créer le lanceur après un changement de machine ou de version de Node :
+| Système | Fichier |
+|---|---|
+| macOS | `Lancer AI Studio.command` |
+| Windows | `Lancer AI Studio.bat` |
+| Linux | `lancer-ai-studio.sh` |
 
-```bash
-bash scripts/install-app.sh
-```
+Rien à installer au préalable. Si Node.js manque, le lanceur récupère
+l'archive officielle dans `.runtime` : aucun droit administrateur, aucun
+`PATH` modifié, et supprimer le dossier efface tout.
+
+**Ollama** reste à installer séparément, depuis [ollama.com](https://ollama.com) :
+son installateur demande une élévation que le lanceur ne peut pas contourner.
+
+Sur macOS, `bash scripts/install-app.sh` crée en plus une application
+double-cliquable sur le Bureau.
 
 ## Développement
 
