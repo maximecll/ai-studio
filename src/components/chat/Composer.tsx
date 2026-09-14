@@ -125,17 +125,16 @@ export function useComposerMode(conversationId: string) {
 /**
  * Coquille du composeur : un tiroir, un en-tête, le champ, un pied, un statut.
  *
- * L'organisation vient du ChatComposer d'Astryx, dont les emplacements nommés
- * rangent mieux que notre barre unique : la jauge de contexte remonte en
- * en-tête, l'avertissement descend sous la carte, et le pied ne garde que les
- * commandes. La bibliothèque elle-même n'est pas embarquée — elle pesait un
- * tiers du paquet et restylait toute l'application.
+ * Les emplacements nommés viennent du ChatComposer d'Astryx, sans la
+ * bibliothèque : elle pesait un tiers du paquet et restylait toute
+ * l'application. La jauge de contexte, elle, reste au pied près du bouton
+ * d'envoi — la remonter en en-tête lui donnait une ligne pour rien et
+ * désaccordait le mode texte du mode image.
  */
 function ComposerShell({
-  drawer, headerContext, footerActions, sendActions, sendButton, status, survol, children, ...zone
+  drawer, footerActions, sendActions, sendButton, status, survol, children, ...zone
 }: {
   drawer?: React.ReactNode
-  headerContext?: React.ReactNode
   footerActions: React.ReactNode
   sendActions?: React.ReactNode
   sendButton: React.ReactNode
@@ -154,10 +153,6 @@ function ComposerShell({
         )}
       >
         {drawer}
-
-        {headerContext && (
-          <div className="flex h-8 items-center justify-end px-5 pt-2">{headerContext}</div>
-        )}
 
         {children}
 
@@ -274,26 +269,6 @@ export function Composer({
             void jointes.add(e.dataTransfer.files)
           }}
           drawer={jointes.items.length ? <PendingStrip items={jointes.items} onRemove={jointes.remove} /> : undefined}
-          headerContext={
-            !image ? (
-              <Tooltip
-                label={`${formatNumber(used)} jetons sur ${formatNumber(ctxMax)} — ${Math.round(filled * 100)} % du contexte`}
-                side="top"
-              >
-                <span className="flex items-center gap-2">
-                  <span className="h-1 w-10 overflow-hidden rounded-full bg-fg/[0.08]">
-                    <span
-                      className={cn('block h-full rounded-full transition-[width] duration-300', tight ? 'bg-caution' : 'bg-fg/35')}
-                      style={{ width: `${Math.max(3, filled * 100)}%` }}
-                    />
-                  </span>
-                  <span className={cn('font-mono text-[11px] tabular-nums whitespace-nowrap', tight ? 'text-caution' : 'text-fg-subtle')}>
-                    {formatCompact(used)} / {formatCompact(ctxMax)}
-                  </span>
-                </span>
-              </Tooltip>
-            ) : undefined
-          }
           footerActions={
             <>
               <ModeToggle mode={mode} onChange={setMode} ready={hasImageModel} />
@@ -334,6 +309,23 @@ export function Composer({
                   <Button size="icon-sm" onClick={() => fichierRef.current?.click()}>
                     <Paperclip className="size-4" />
                   </Button>
+                </Tooltip>
+
+                <Tooltip
+                  label={`${formatNumber(used)} jetons sur ${formatNumber(ctxMax)} — ${Math.round(filled * 100)} % du contexte`}
+                  side="top"
+                >
+                  <span className="hidden items-center gap-2 pr-1 sm:flex">
+                    <span className="h-1 w-10 overflow-hidden rounded-full bg-fg/[0.08]">
+                      <span
+                        className={cn('block h-full rounded-full transition-[width] duration-300', tight ? 'bg-caution' : 'bg-fg/35')}
+                        style={{ width: `${Math.max(3, filled * 100)}%` }}
+                      />
+                    </span>
+                    <span className={cn('font-mono text-[11px] tabular-nums whitespace-nowrap', tight ? 'text-caution' : 'text-fg-subtle')}>
+                      {formatCompact(used)} / {formatCompact(ctxMax)}
+                    </span>
+                  </span>
                 </Tooltip>
               </>
             ) : undefined
