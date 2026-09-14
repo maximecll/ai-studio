@@ -25,3 +25,6 @@ tsconfig.tsbuildinfo
 # Cache Python du worker d'images
 __pycache__/
 *.pyc
+
+# Journal de travail : notes personnelles, hors du dépôt public.
+PLAN.md
