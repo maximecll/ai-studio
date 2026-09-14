@@ -1,6 +1,6 @@
 /** Génération d'images. */
 import { create } from 'zustand'
-import { addMessage, db, getSettings, putImage, readImage } from '../lib/db'
+import { addMessage, db, getSettings, patchSettings, putImage, readImage } from '../lib/db'
 import { attachTask, listTasks } from '../lib/tasks'
 import { formatBytes } from '../lib/utils'
 import * as images from '../lib/images'
@@ -193,6 +193,7 @@ export const useImages = create<State>((set, get) => {
       running.set(conversationId, controller)
 
       let produced: { id: string; seed: number; ms: number } | null = null
+      let charge: number | null = null
       let failure: string | null = null
 
       try {
@@ -234,6 +235,9 @@ export const useImages = create<State>((set, get) => {
                  l'inclure fausserait l'estimation pour tous les suivants. */
               const stepMs =
                 ev.step <= 1 || !cur ? (cur?.stepMs ?? ASSUMED_STEP_MS) : cur.stepMs * 0.6 + ev.stepMs * 0.4
+              // Le premier pas marque la fin du chargement : c'est là qu'on
+              // peut le mesurer, et nulle part ailleurs.
+              if (ev.step === 1 && cur) charge = Date.now() - cur.startedAt
               patchJob(conversationId, { phase: 'diffusing', step: ev.step, steps: ev.steps, stepMs })
               break
             }
@@ -250,6 +254,7 @@ export const useImages = create<State>((set, get) => {
         }
 
         if (produced) {
+          void apprendreDuree(params, get().jobs[conversationId], charge, produced.ms)
           patchJob(conversationId, { phase: 'saving', label: 'Enregistrement' })
           const bytes = await images.collect(produced.id)
           const blobId = await putImage(conversationId, bytes)
@@ -446,6 +451,56 @@ export function releaseURL(blobId: string): void {
 /** Durée totale estimée d'une tâche, en millisecondes. */
 export function estimatedDuration(job: Job): number {
   return job.steps * job.stepMs + 20_000
+}
+
+/**
+ * Retient ce que cette génération a réellement coûté.
+ *
+ * Le catalogue ne porte qu'un ordre de grandeur, mesuré sur une machine qui
+ * n'est pas celle-ci : sur un GPU qui décharge ses couches vers le processeur,
+ * il annonce le tiers du temps réel. Une moyenne glissante sur les générations
+ * passées vaut mieux que n'importe quelle valeur écrite d'avance.
+ */
+async function apprendreDuree(
+  params: ImageParams,
+  job: Job | undefined,
+  loadMs: number | null,
+  totalMs: number,
+) {
+  if (!job || !job.steps) return
+  const area = (job.width * job.height) / (768 * 768)
+  if (!area) return
+
+  /* Le total vient du worker et n'est lissé par rien ; `job.stepMs`, lui,
+     part d'une valeur supposée et garde un reste de biais sur une génération
+     courte. On ne s'en sert qu'à défaut. */
+  const charge = loadMs ?? 20_000
+  const debruitage = totalMs - charge
+  const parPas = debruitage > 0 ? debruitage / job.steps : job.stepMs
+  if (!parPas) return
+
+  const releve = { msPerStep768: parPas / area, loadMs: charge }
+  const settings = await getSettings()
+  const connu = settings.imageTimings?.[params.model]
+  // Moyenne glissante : une génération lente ponctuelle ne fausse pas tout.
+  const fondu = (avant: number, apres: number) => (connu ? avant * 0.6 + apres * 0.4 : apres)
+
+  /* Le chargement, lui, ne se moyenne pas : relire le modèle depuis le disque
+     coûte vingt secondes, le relire depuis le cache du système en coûte trois.
+     On retient le pire, qu'on laisse redescendre lentement — sous-estimer est
+     la seule erreur qui se remarque. */
+  const charge2 = Math.max(releve.loadMs, (connu?.loadMs ?? 0) * 0.9)
+
+  await patchSettings({
+    imageTimings: {
+      ...settings.imageTimings,
+      [params.model]: {
+        msPerStep768: Math.round(fondu(connu?.msPerStep768 ?? 0, releve.msPerStep768)),
+        loadMs: Math.round(charge2),
+        samples: (connu?.samples ?? 0) + 1,
+      },
+    },
+  })
 }
 
 /** Ce qu'affiche la pastille de la mosaïque, selon l'étape en cours. */

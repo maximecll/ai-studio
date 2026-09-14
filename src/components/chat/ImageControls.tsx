@@ -8,6 +8,7 @@ import {
   DEFAULT_LORA_SCALE, DEFINITIONS, RATIOS, activeLoras, describeSize, dimensions,
   estimate, imageModelName, loraMismatch, modelOf, revealLoras, roughly,
 } from '../../lib/images'
+import { useSettings } from '../../lib/hooks'
 import type { ImageModel, ImageParams, LoraFile } from '../../lib/types'
 import { cn, formatBytes } from '../../lib/utils'
 import { useImages } from '../../store/images'
@@ -204,14 +205,18 @@ export function ImageControls({ params, onPatch }: {
   onPatch: (p: Partial<ImageParams>) => void
 }) {
   const { engine } = useImageEngine()
+  const settings = useSettings()
   const catalog = engine?.catalog ?? []
   const installed = catalog.filter((m) => m.installed)
   const current = modelOf(catalog, params.model)
   const { ratio, def } = describeSize(params.width, params.height)
 
   const steps = params.steps ?? current?.steps.default ?? 20
-  const perStep = current?.msPerStep768 ?? 27_000
-  const fixed = current?.loadMs ?? 20_000
+  /* Ce que cette machine a réellement mis, quand elle l'a déjà fait. Le
+     catalogue ne sert plus que de première approximation. */
+  const releve = settings.imageTimings?.[params.model]
+  const perStep = releve?.msPerStep768 ?? current?.msPerStep768 ?? 27_000
+  const fixed = releve?.loadMs ?? current?.loadMs ?? 20_000
   const wait = roughly(estimate(steps, params.width, params.height, perStep, fixed))
 
   return (
@@ -312,9 +317,9 @@ export function ImageControls({ params, onPatch }: {
       {/* Le temps attendu remplace la jauge de contexte, qui n'a pas de sens ici. */}
       <Tooltip
         label={
-          current?.measured
-            ? `Estimation pour ${steps} pas en ${params.width} × ${params.height}, mesurée sur cette machine`
-            : `Estimation pour ${steps} pas en ${params.width} × ${params.height}, déduite de la taille du modèle — pas encore chronométrée`
+          releve
+            ? `Estimation pour ${steps} pas en ${params.width} × ${params.height}, d’après ${releve.samples} génération${releve.samples > 1 ? 's' : ''} sur cette machine`
+            : `Estimation pour ${steps} pas en ${params.width} × ${params.height}, déduite du catalogue — la première génération la corrigera`
         }
         side="top"
       >
