@@ -35,6 +35,10 @@ Puis **double-cliquez** sur le lanceur de votre système :
 > `.runtime` : aucun droit administrateur, aucun `PATH` modifié. Supprimer ce
 > dossier efface tout.
 
+**Fermer la fenêtre du lanceur arrête tout** : le serveur et le moteur Ollama
+qu'il a démarré, sans laisser de processus derrière — sinon le dossier resterait
+verrouillé et impossible à supprimer.
+
 **git** est le seul outil qui doit déjà être là — il sert à cloner, puis à
 recevoir les mises à jour. Présent d'office sur macOS et la plupart des Linux,
 à installer sous Windows depuis [git-scm.com](https://git-scm.com/downloads).
