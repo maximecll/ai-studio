@@ -261,8 +261,11 @@ const MODELS = [
     steps: { default: 4, min: 1, max: 8 },
     // Distillé sans branche de guidage, comme schnell.
     guidance: null,
-    msPerStep768: 2_000,
-    loadMs: 25_000,
+    /* Recalé sur un relevé utilisateur : SDXL, 1024², 30 pas, 6 min 30 sur une
+       carte de 8 Go qui décharge vers le processeur. Mieux vaut annoncer trop
+       que trop peu ; la première génération corrigera. */
+    msPerStep768: 6_500,
+    loadMs: 40_000,
     measured: false,
     note: 'Quelques pas suffisent. Le plus rapide sur carte NVIDIA, et le seul tenable sans carte du tout.',
     recommended: true,
@@ -286,8 +289,8 @@ const MODELS = [
     bytes: 7_110_000_000,
     steps: { default: 30, min: 10, max: 50 },
     guidance: { default: 5, min: 1, max: 12 },
-    msPerStep768: 1_500,
-    loadMs: 25_000,
+    msPerStep768: 6_500,
+    loadMs: 40_000,
     measured: false,
     note: 'La version complète : trente pas, nettement plus fine que Turbo. Demande une carte graphique.',
   },
@@ -308,8 +311,9 @@ const MODELS = [
     bytes: 2_740_000_000,
     steps: { default: 25, min: 10, max: 50 },
     guidance: { default: 7.5, min: 1, max: 15 },
-    msPerStep768: 700,
-    loadMs: 12_000,
+    // Trois fois plus léger que SDXL, à l'échelle du même relevé.
+    msPerStep768: 2_200,
+    loadMs: 20_000,
     measured: false,
     note: 'Le plus léger : deux gigaoctets, quelques minutes sur processeur. Qualité d’une génération d’avant SDXL.',
   },

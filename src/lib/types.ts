@@ -200,6 +200,15 @@ export interface Folder {
 }
 
 
+export interface ImageTiming {
+  /** Chargement du modèle, hors débruitage. */
+  loadMs: number
+  /** Millisecondes par pas, ramenées à une surface de 768². */
+  msPerStep768: number
+  /** Nombre de générations ayant nourri la moyenne. */
+  samples: number
+}
+
 export interface Settings {
   id: 'app'
   /** Nom d'affichage, utilisé dans la salutation de l'accueil. */
@@ -224,6 +233,9 @@ export interface Settings {
   keepAlive: string
   /** Réglages de diffusion dont héritent les nouvelles conversations. */
   imageParams: ImageParams
+  /** Durées relevées sur cette machine, par modèle d'images. Le catalogue ne
+      donne qu'un ordre de grandeur : seule la machine sait ce qu'elle vaut. */
+  imageTimings?: Record<string, ImageTiming>
   density: 'cosy' | 'compact'
 }
 
