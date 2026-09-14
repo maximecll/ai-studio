@@ -27,7 +27,7 @@ const KEEP_ALIVE = [
 
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="overflow-hidden rounded-lg bg-surface shadow-card">
+    <section className="mb-6 break-inside-avoid overflow-hidden rounded-lg bg-surface shadow-card">
       <header className="border-b border-line px-5 py-3">
         <h2 className="t-label text-fg-subtle">{title}</h2>
       </header>
@@ -40,13 +40,14 @@ function Segmented<T extends string>({
   options, value, onChange,
 }: { options: Array<{ value: T; label: string; icon?: React.ReactNode }>; value: T; onChange: (v: T) => void }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    // Cellules d'égale largeur : un choix orphelin ne s'étire pas sur sa ligne.
+    <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(4.5rem, 1fr))' }}>
       {options.map((o) => (
         <button
           key={o.value}
           onClick={() => onChange(o.value)}
           className={cn(
-            'flex h-10 min-w-24 flex-1 items-center justify-center gap-2 rounded-full border text-[14px] font-medium transition-all duration-150',
+            'flex h-10 items-center justify-center gap-2 rounded-full border text-[14px] font-medium transition-all duration-150',
             value === o.value
               ? 'border-transparent bg-solid text-solid-fg'
               : 'border-line bg-surface text-fg-muted hover:bg-fg/[0.04] hover:text-fg',
@@ -80,7 +81,7 @@ export function SettingsView() {
 
   return (
     <Page title="Réglages" subtitle="Tout est stocké sur cette machine.">
-      <div className="grid items-start gap-6 lg:grid-cols-2">
+      <div className="columns-1 gap-6 lg:columns-2">
         <Group title="Apparence">
           <Field label="Nom d’affichage" hint="Utilisé pour vous saluer sur la page d’accueil.">
             <Input
