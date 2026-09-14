@@ -93,6 +93,10 @@ async function findOllama() {
   return connu ? { bin: connu, source: 'system' } : null
 }
 
+/** PowerShell écrit dans la page OEM quand sa sortie est redirigée : sans ce
+    préfixe, tout accent revient abîmé. */
+export const PS_UTF8 = '[Console]::OutputEncoding=[Text.Encoding]::UTF8; '
+
 /* ── Git ──────────────────────────────────────────────────────────── */
 
 function portableGit() {
@@ -168,7 +172,7 @@ async function windowsRegistry() {
     '} | Sort-Object Vram -Descending | Select-Object -First 1 | ConvertTo-Json -Compress',
   ].join(' ')
 
-  const { stdout } = await run('powershell', ['-NoProfile', '-Command', script], { timeout: 25000 })
+  const { stdout } = await run('powershell', ['-NoProfile', '-Command', PS_UTF8 + script], { timeout: 25000 })
   const carte = JSON.parse(stdout.trim() || 'null')
   if (!carte?.Vram) throw new Error('Registre muet')
   return { name: carte.Name ?? 'GPU inconnu', unified: false, vram: Number(carte.Vram), source: 'registre' }
@@ -204,7 +208,7 @@ async function gpu() {
       }
       // Dernier recours : AdapterRAM, en écartant sa valeur saturée.
       const { stdout } = await run('powershell', ['-NoProfile', '-Command',
-        'Get-CimInstance Win32_VideoController | Select-Object Name,AdapterRAM | ConvertTo-Json -Compress'],
+        `${PS_UTF8}Get-CimInstance Win32_VideoController | Select-Object Name,AdapterRAM | ConvertTo-Json -Compress`],
         { timeout: 20000 })
       const list = [].concat(JSON.parse(stdout))
       const best = list.sort((x, y) => (y.AdapterRAM ?? 0) - (x.AdapterRAM ?? 0))[0] ?? {}
