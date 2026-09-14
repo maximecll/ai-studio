@@ -127,15 +127,15 @@ Installe deux agents de session : Ollama et le serveur Studio démarrent à
 l'ouverture de session et redémarrent s'ils tombent. Plus rien à lancer, et
 aucune connexion réseau n'est nécessaire. Pour retirer : `--uninstall`.
 
-## Accès depuis le réseau local ou l'extérieur
+## Accès depuis un autre appareil
 
-- `deploy/RESEAU-LOCAL.md` — nom local sur la box, avec HTTPS. **À lire** :
-  sans contexte sécurisé, les navigateurs coupent WebCrypto, donc le
-  chiffrement.
-- `deploy/TUNNEL.md` — accès depuis l'extérieur. En résumé : tunnel Cloudflare vers le port 5300,
-**avec une politique Cloudflare Access devant**. Studio n'a pas
-d'authentification : exposer le tunnel sans portail d'identité livre l'API
-Ollama à quiconque devine le sous-domaine.
+AI Studio n'a **aucune authentification** : il est prévu pour tourner sur votre
+machine. Si vous le servez sur votre réseau local (`HOST=0.0.0.0 node server.mjs`),
+toute personne sur ce réseau y accède, et l'API Ollama avec. Ne l'exposez jamais
+sur internet sans portail d'identité devant.
+
+Sans HTTPS hors `localhost`, le chiffrement des conversations devient
+indisponible — voir plus haut.
 
 ## Architecture
 
