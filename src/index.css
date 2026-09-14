@@ -137,7 +137,7 @@
   --color-caution: var(--caution);
   --color-caution-wash: var(--caution-wash);
 
-  --font-sans: var(--ui-font, 'DM Sans'), 'Satoshi', 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-sans: 'Satoshi', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
 
   /* Deux rayons nommés ; tout le reste est une pilule. */
