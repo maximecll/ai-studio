@@ -40,11 +40,18 @@ export interface Verdict {
 /** Marge laissée au système : ni le GPU ni la mémoire vive ne sont libres en entier. */
 const MARGE = 0.9
 
-/** Sans la forme du modèle, le cache d'attention est inconnu : on majore les
-    poids plutôt que de ne rien dire. */
+/**
+ * Sans la forme du modèle, le cache d'attention est incalculable : on majore
+ * les poids. Le facteur vient du rapport observé entre le transfert et
+ * l'empreinte réelle sur les modèles installés — 1,45 à 1,70 selon le
+ * contexte. Majorer moins reviendrait à promettre ce que la machine ne tient
+ * pas, et à contredire le verdict affiché après installation.
+ */
+const SANS_FORME = 1.6
+
 function besoin(weights: number, shape: ModelShape | null, numCtx: number): { need: number; exact: boolean } {
   const est = estimateMemory(weights, shape, numCtx)
-  return est ? { need: est.total, exact: true } : { need: weights * 1.15, exact: false }
+  return est ? { need: est.total, exact: true } : { need: weights * SANS_FORME, exact: false }
 }
 
 /**
