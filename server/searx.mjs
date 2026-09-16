@@ -236,11 +236,23 @@ function installer() {
           }
 
           // 3. Sources de SearXNG (clone superficiel de master).
+          //    Le dépôt versionne des gabarits de déploiement dont le nom
+          //    contient « : » (ex. utils/.../searxng.conf:socket), interdit
+          //    sous Windows : leur écriture dans l'arbre de travail échoue.
+          //    On ne matérialise donc que le paquet Python (searx/) et les
+          //    fichiers racine — tout ce dont pip a besoin, jamais utils/.
           const git = gitBin()
           await rm(SRC, { recursive: true, force: true })
           await mkdir(RUNTIME, { recursive: true })
-          const clone = await run(git, ['clone', '--depth', '1', REPO, SRC], 'Téléchargement de SearXNG')
-          if (clone.code !== 0) return done(send({ type: 'error', message: `Clone de SearXNG échoué : ${clone.tail.slice(-300)}` }))
+          const gitEtapes = [
+            [['clone', '--depth', '1', '--no-checkout', REPO, SRC], 'Téléchargement de SearXNG'],
+            [['-C', SRC, 'sparse-checkout', 'set', '--cone', 'searx'], null],
+            [['-C', SRC, 'checkout'], null],
+          ]
+          for (const [args, label] of gitEtapes) {
+            const r = await run(git, args, label)
+            if (r.code !== 0) return done(send({ type: 'error', message: `Clone de SearXNG échoué : ${r.tail.slice(-300)}` }))
+          }
 
           // 4. pip à jour, puis les dépendances, puis SearXNG lui-même.
           //    Ses dépendances passent d'abord : le backend de compilation
