@@ -55,7 +55,7 @@ export function ChatView({ conv }: { conv: Conversation }) {
   const awaitingImage = awaitingAnswer ? pending?.imageRequest : undefined
   const shown = showFolded ? messages : live
 
-  // Recoller une réponse déjà présente pousse le modèle à la reproduire au lieu de l'exécuter — mesuré, et insensible à toute consigne.
+  // Recoller une réponse déjà présente pousse le modèle à la reproduire au lieu de l'exécuter, mesuré, et insensible à toute consigne.
   const [echoWarning, setEchoWarning] = useState<{ text: string; files: File[] } | null>(null)
 
   const onSend = useCallback(
@@ -68,7 +68,7 @@ export function ChatView({ conv }: { conv: Conversation }) {
   )
 
   /* Un message rejoué dans une conversation neuve échappe à l'influence des
-     tours précédents — c'est le remède au modèle qui recopie ce qu'il a lu. */
+     tours précédents, c'est le remède au modèle qui recopie ce qu'il a lu. */
   const onGenerate = useCallback(
     (prompt: string, params: ImageParams) => void generate(conv.id, prompt, params),
     [conv.id, generate],
@@ -247,7 +247,7 @@ export function ChatView({ conv }: { conv: Conversation }) {
         >
           <p className="t-meta text-fg-muted">
             Le modèle voit ce texte comme quelque chose qu'il a déjà produit, et complète le motif en
-            le répétant. Aucune consigne ne l'en dissuade — seul un contexte vierge y parvient.
+            le répétant. Aucune consigne ne l'en dissuade, seul un contexte vierge y parvient.
           </p>
           <p className="t-caption mt-3 text-fg-subtle">
             « Rejouer à part » ouvre une conversation neuve avec le même modèle et les mêmes réglages,

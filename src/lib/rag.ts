@@ -1,4 +1,4 @@
-/** Cœur du RAG : découpage, vectorisation, recherche par similarité — en local. */
+/** Cœur du RAG : découpage, vectorisation, recherche par similarité, en local. */
 import { db } from './db'
 import { ollama } from './ollama'
 import type { Chunk } from './types'

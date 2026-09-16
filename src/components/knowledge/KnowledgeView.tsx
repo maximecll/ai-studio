@@ -79,7 +79,7 @@ function BaseCard({ base }: { base: KnowledgeBase }) {
       {busy && (
         <p className="t-caption flex items-center gap-2 border-t border-line px-5 py-3 text-fg-muted">
           <Loader2 className="size-4 shrink-0 animate-spin" />
-          Indexation — {indexing.label} ({indexing.done + 1}/{indexing.total})
+          Indexation : {indexing.label} ({indexing.done + 1}/{indexing.total})
         </p>
       )}
 
@@ -90,7 +90,7 @@ function BaseCard({ base }: { base: KnowledgeBase }) {
           onDrop={(e) => { e.preventDefault(); void addFiles(base.id, [...e.dataTransfer.files]) }}
         >
           <p className="t-meta text-fg-muted">
-            Déposez des fichiers ici — <span className="font-mono">PDF</span>, Markdown, code, <span className="font-mono">.txt</span>, JSON, CSV…
+            Déposez des fichiers ici : <span className="font-mono">PDF</span>, Markdown, code, <span className="font-mono">.txt</span>, JSON, CSV…
             Ils sont découpés et vectorisés en local, puis le modèle s’appuiera dessus quand la base est activée
             dans une conversation.
           </p>
@@ -170,7 +170,7 @@ export function KnowledgeView() {
       {!hasEmbed && (
         <p className="t-caption mb-6 flex items-start gap-2 rounded-sm bg-caution-wash px-4 py-3 text-fg-muted">
           <Layers className="mt-0.5 size-4 shrink-0 text-caution" />
-          Le modèle d’embedding <span className="font-mono">{DEFAULT_EMBED_MODEL}</span> n’est pas installé — il
+          Le modèle d’embedding <span className="font-mono">{DEFAULT_EMBED_MODEL}</span> n’est pas installé, il
           vectorise les documents. Installez-le depuis la page Modèles (≈ 270 Mo) avant d’indexer.
         </p>
       )}
@@ -180,7 +180,7 @@ export function KnowledgeView() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void ajouter() }}
-          placeholder="Nom d’une nouvelle base — ex. « Doc React », « Mon code »"
+          placeholder="Nom d’une nouvelle base, ex. « Doc React », « Mon code »"
           className="min-w-56 flex-1"
         />
         <button

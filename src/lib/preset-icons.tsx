@@ -4,7 +4,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-/** Jeu d'icônes fermé — une seule bibliothèque, un seul trait, une seule taille. */
+/** Jeu d'icônes fermé, une seule bibliothèque, un seul trait, une seule taille. */
 export const PRESET_ICONS: Record<string, LucideIcon> = {
   sparkles: Sparkles,
   terminal: Terminal,

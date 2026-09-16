@@ -126,7 +126,7 @@ export const useKnowledge = create<KnowledgeState>((set, get) => ({
         const docId = uid()
         const now = Date.now()
         // Le texte du morceau est chiffré si la base l'est ; le vecteur reste
-        // en clair — il sert à la recherche et ne restitue pas le texte.
+        // en clair, il sert à la recherche et ne restitue pas le texte.
         const rows = await Promise.all(
           morceaux.map(async (text, index) => ({
             id: uid(), knowledgeId: id, docId, docName: file.name, index,

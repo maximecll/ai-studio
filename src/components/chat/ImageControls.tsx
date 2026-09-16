@@ -1,4 +1,4 @@
-/** Commandes de diffusion — les mêmes dans le composeur et sur l'accueil. */
+/** Commandes de diffusion, les mêmes dans le composeur et sur l'accueil. */
 import { useEffect } from 'react'
 import {
   Check, ChevronDown, FolderOpen, Image as ImageIcon, Layers, Maximize2,
@@ -31,7 +31,7 @@ export function ModeToggle({ mode, onChange, ready }: { mode: 'text' | 'image'; 
 
   if (!ready && mode === 'text') {
     return (
-      <Tooltip label="Aucun modèle d’images installé — à faire depuis « Modèles »" side="top">
+      <Tooltip label="Aucun modèle d’images installé, à faire depuis « Modèles »" side="top">
         <Chip as="button" className="shrink-0 opacity-50" onClick={() => navigate(href.models())}>
           <ImageIcon className="size-3.5" />
           <span className="hidden sm:inline">Image</span>
@@ -319,7 +319,7 @@ export function ImageControls({ params, onPatch }: {
         label={
           releve
             ? `Estimation pour ${steps} pas en ${params.width} × ${params.height}, d’après ${releve.samples} génération${releve.samples > 1 ? 's' : ''} sur cette machine`
-            : `Estimation pour ${steps} pas en ${params.width} × ${params.height}, déduite du catalogue — la première génération la corrigera`
+            : `Estimation pour ${steps} pas en ${params.width} × ${params.height}, déduite du catalogue, la première génération la corrigera`
         }
         side="top"
       >

@@ -30,7 +30,7 @@ const CAPABILITIES: Record<string, { label: string; icon: React.ReactNode }> = {
   insert: { label: 'Insertion', icon: <MessageSquarePlus className="size-3" /> },
 }
 
-/** File des téléchargements — sous la liste des modèles, toujours visible. */
+/** File des téléchargements, sous la liste des modèles, toujours visible. */
 function Downloads() {
   const items = useDownloads((s) => s.items)
   const list = Object.values(items).sort((a, b) => a.startedAt - b.startedAt)
@@ -257,7 +257,7 @@ export function ModelsView() {
                   {onCpu.length > 1 ? 'Des modèles tournent' : 'Un modèle tourne'} sur le processeur
                 </p>
                 <p className="mt-1 text-[14px] text-fg-muted">
-                  {onCpu.map((m) => prettyModel(m.name)).join(', ')} — aucune couche sur le GPU.
+                  {onCpu.map((m) => prettyModel(m.name)).join(', ')}, aucune couche sur le GPU.
                   Le débit est environ cinq fois plus faible qu'il ne devrait l'être.
                 </p>
                 <p className="mt-2 text-[14px] text-fg-muted">

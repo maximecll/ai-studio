@@ -41,7 +41,7 @@ const TYPES = {
   '.map': 'application/json; charset=utf-8',
 }
 
-/** Relais vers l'API Hugging Face — son CORS interdit l'appel direct. */
+/** Relais vers l'API Hugging Face, son CORS interdit l'appel direct. */
 function proxyHuggingFace(req, res) {
   const path = req.url.replace(/^\/hf/, '') || '/'
   const upstream = httpsRequest(

@@ -19,10 +19,10 @@ export interface Stream {
   content: string
   thinking: string
   startedAt: number
-  /** Horodatage mural, figé au démarrage — pour l'affichage de l'heure. */
+  /** Horodatage mural, figé au démarrage, pour l'affichage de l'heure. */
   at: number
   ttft?: number
-  /** Jetons produits jusqu'ici — Ollama en émet un par fragment. */
+  /** Jetons produits jusqu'ici, Ollama en émet un par fragment. */
   tokens: number
   /** Jetons consommés par le raisonnement, comptés à part. */
   thinkingTokens: number
@@ -51,7 +51,7 @@ const controllers = new Map<string, AbortController>()
 const FIRST_CHUNK_MS = 180_000 // le chargement d'un gros modèle peut être long
 const BETWEEN_CHUNKS_MS = 90_000
 
-/** Rang de la distribution observée pour l'entropie — le « 8 » de H₈. */
+/** Rang de la distribution observée pour l'entropie, le « 8 » de H₈. */
 export const TOP_LOGPROBS = 8
 
 export const useChat = create<ChatState>((set, get) => {

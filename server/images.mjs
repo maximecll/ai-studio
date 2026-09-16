@@ -27,7 +27,7 @@ const PYTHON = venvPython(VENV)
 /** Les images fraîches attendent ici que l'interface vienne les chercher. */
 const STAGING = join(homedir(), '.studio', 'images')
 
-/** Bibliothèque de LoRAs — un simple dossier où l'on dépose des fichiers. */
+/** Bibliothèque de LoRAs, un simple dossier où l'on dépose des fichiers. */
 const LORAS = process.env.STUDIO_LORAS ?? join(homedir(), '.studio', 'loras')
 /** Au-delà, une image non récupérée est un déchet : l'onglet a été fermé. */
 const STALE_MS = 6 * 60 * 60 * 1000
@@ -171,7 +171,7 @@ const MODELS = [
     steps: { default: 20, min: 4, max: 40 },
     guidance: { default: 5, min: 1, max: 10 },
     // Mesuré : 4,5 s par pas à 768². Le débruitage est six fois plus rapide
-    // que FLUX — la séquence latente ne fait que 576 jetons contre 2 304.
+    // que FLUX, la séquence latente ne fait que 576 jetons contre 2 304.
     msPerStep768: 4_500,
     // Mais l'encodeur UMT5-XXL coûte 124 s à charger, et le VAE 19 s à décoder :
     // un coût fixe bien plus lourd que celui de mflux, indépendant du nombre de pas.
@@ -205,7 +205,7 @@ const MODELS = [
     msPerStep768: 14_000,
     loadMs: 200_000,
     measured: false,
-    note: "Le grand modèle Wan, celui des LoRAs courants. Deux experts de 8,4 Go : au-delà de ce que 16 Go de mémoire peuvent tenir — à essayer, sans garantie.",
+    note: "Le grand modèle Wan, celui des LoRAs courants. Deux experts de 8,4 Go : au-delà de ce que 16 Go de mémoire peuvent tenir, à essayer, sans garantie.",
     heavy: true,
   },
   {
@@ -229,7 +229,7 @@ const MODELS = [
     msPerStep768: 30_000,
     loadMs: 20_000,
     measured: false,
-    note: "Quantification plus fine, donc plus fidèle — mais 18 Go de poids et un recours probable au disque sur 16 Go de mémoire.",
+    note: "Quantification plus fine, donc plus fidèle, mais 18 Go de poids et un recours probable au disque sur 16 Go de mémoire.",
     heavy: true,
   },
   {
@@ -394,7 +394,7 @@ function expertOf(meta, filename) {
   return undefined
 }
 
-/** Mot déclencheur, tel que les outils d'entraînement le rangent — au mieux. */
+/** Mot déclencheur, tel que les outils d'entraînement le rangent, au mieux. */
 function triggerOf(meta) {
   const direct = meta['modelspec.trigger_phrase'] ?? meta.ss_output_name
   try {
@@ -432,9 +432,9 @@ async function describeLora(name) {
     file: name,
     name: meta['modelspec.title'] || name.replace(/\.safetensors$/i, ''),
     bytes: size,
-    /* Ce que le fichier déclare — indicatif, et régulièrement faux. */
+    /* Ce que le fichier déclare, indicatif, et régulièrement faux. */
     architecture,
-    /* Ce que ses clés démontrent — fiable, c'est là-dessus qu'on tranche. */
+    /* Ce que ses clés démontrent, fiable, c'est là-dessus qu'on tranche. */
     target: targetOf(header),
     width: widthOf(header),
     rank: rankOf(meta, header),
@@ -582,7 +582,7 @@ const pulls = new Map()
 
 /* ── Installation du moteur ──────────────────────────────────────── */
 
-/** Une carte NVIDIA change la roue PyTorch à installer — et tout le reste. */
+/** Une carte NVIDIA change la roue PyTorch à installer, et tout le reste. */
 async function hasNvidia() {
   try {
     await execute('nvidia-smi', ['-L'], { timeout: 8000 })
@@ -596,7 +596,7 @@ async function hasNvidia() {
  * Un échec d'écriture qui survit à la reconstruction de l'environnement n'est
  * plus un fichier verrouillé. Sous Windows, la cause courante est l'accès
  * contrôlé aux dossiers, qui protège `Documents` et refuse l'écriture aux
- * programmes qu'il ne connaît pas — sans que rien ne le dise clairement.
+ * programmes qu'il ne connaît pas, sans que rien ne le dise clairement.
  */
 async function expliquerPip(tail) {
   const brut = tail.slice(-300)
@@ -690,7 +690,7 @@ function pipInstall(send) {
          fichier d'un essai précédent est encore verrouillé, ou à moitié
          écrit. Refaire l'environnement coûte moins cher que d'expliquer. */
       if (pip.code !== 0 && VERROUILLE.test(pip.tail)) {
-        send({ type: 'log', line: 'Environnement abîmé par un essai précédent — reconstruction.' })
+        send({ type: 'log', line: 'Environnement abîmé par un essai précédent, reconstruction.' })
         await rm(VENV, { recursive: true, force: true })
         const hote = await hostPython()
         const neuf = await run(hote.cmd, [...hote.prefixe, '-m', 'venv', VENV], "Reconstruction de l'environnement")
@@ -833,7 +833,7 @@ async function status(res) {
 }
 
 /** Détachée de la requête : rafraîchir la page n'interrompt rien.
-    `fresh` jette l'environnement avant de repartir — ce qu'il faut après une
+    `fresh` jette l'environnement avant de repartir, ce qu'il faut après une
     installation coupée au milieu. */
 async function install(req, res) {
   const { fresh } = await readBody(req).catch(() => ({}))

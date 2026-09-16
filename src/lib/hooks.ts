@@ -36,7 +36,7 @@ export function useImageURL(blobId: string | undefined): string | null {
   return url
 }
 
-/** `undefined` tant que la base n'a pas répondu — à distinguer d'une base vide. */
+/** `undefined` tant que la base n'a pas répondu, à distinguer d'une base vide. */
 export function useConversations(): Conversation[] | undefined {
   const unlocked = useVault((s) => s.unlocked)
   return useLiveQuery(
@@ -108,7 +108,7 @@ export function useMediaQuery(query: string): boolean {
 }
 
 /** Connexion Internet de la machine. `navigator.onLine` passe à faux dès que
-    le système perd le réseau — de quoi bloquer la recherche web, qui a besoin
+    le système perd le réseau, de quoi bloquer la recherche web, qui a besoin
     d'Internet pour interroger les moteurs. */
 export function useOnline(): boolean {
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine)

@@ -34,7 +34,7 @@ export function UpdateSettings() {
       for await (const ev of installGit()) {
         if (ev.type === 'phase') setPose(ev.label)
         if (ev.type === 'progress' && ev.total) {
-          setPose(`Téléchargement — ${formatBytes(ev.completed)} / ${formatBytes(ev.total)}`)
+          setPose(`Téléchargement : ${formatBytes(ev.completed)} / ${formatBytes(ev.total)}`)
         }
         if (ev.type === 'error') {
           toast({ title: 'Installation de git impossible', description: ev.message, tone: 'danger' })

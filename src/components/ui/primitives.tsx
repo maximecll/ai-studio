@@ -7,7 +7,7 @@ import { AnimatePresence, motion, type HTMLMotionProps } from 'framer-motion'
 import { Check, ChevronDown, X, type LucideIcon } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
-// ═══════════════════════════════════════════════════════════════════ Boutons — capsule systématique, 13px medium, réaction au survol et à l'appui.
+// ═══════════════════════════════════════════════════════════════════ Boutons, capsule systématique, 13px medium, réaction au survol et à l'appui.
 
 type Variant = 'primary' | 'soft' | 'quiet' | 'danger'
 type Size = 'sm' | 'md' | 'lg' | 'icon-sm' | 'icon' | 'icon-lg'
@@ -235,7 +235,7 @@ export function Card({ children, className, float }: { children: ReactNode; clas
   )
 }
 
-/** Badge — deux variantes seulement : · outline : fond transparent, contour d'un pixel · soft : fond teinté, aucun contour Géométrie fixe h-6 / px-3 /… */
+/** Badge, deux variantes seulement : · outline : fond transparent, contour d'un pixel · soft : fond teinté, aucun contour Géométrie fixe h-6 / px-3 /… */
 type BadgeTone = 'neutral' | 'positive' | 'caution' | 'negative'
 
 const BADGE_SOFT: Record<BadgeTone, string> = {
@@ -524,7 +524,7 @@ export function Textarea({ className, ...props }: React.TextareaHTMLAttributes<H
   return <textarea {...props} className={cn(CONTROL, 'resize-none px-3 py-2.5 leading-relaxed scroll-thin', className)} />
 }
 
-/** Liste déroulante maison — rien de natif : même rayon, même graisse, mêmes teintes que le reste, et le panneau suit la largeur du champ. */
+/** Liste déroulante maison, rien de natif : même rayon, même graisse, mêmes teintes que le reste, et le panneau suit la largeur du champ. */
 export function Dropdown<T extends string>({
   value, onChange, options, placeholder = 'Choisir…', className,
 }: {

@@ -39,7 +39,7 @@ function Quants({ repo }: { repo: string }) {
     return (
       <p className="t-caption flex items-start gap-2 px-4 pb-4 text-fg-muted">
         <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-caution" />
-        Aucun fichier GGUF utilisable dans ce dépôt — Ollama ne sait pas le tirer.
+        Aucun fichier GGUF utilisable dans ce dépôt, Ollama ne sait pas le tirer.
       </p>
     )
   }
@@ -74,7 +74,7 @@ function Quants({ repo }: { repo: string }) {
           </button>
         )
         return v
-          ? <Tooltip key={q.label} label={`${v.label} — ${v.tip}`} side="top">{pastille}</Tooltip>
+          ? <Tooltip key={q.label} label={`${v.label}, ${v.tip}`} side="top">{pastille}</Tooltip>
           : <span key={q.label}>{pastille}</span>
       })}
       {hardware && (

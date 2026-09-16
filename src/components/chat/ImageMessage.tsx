@@ -145,7 +145,7 @@ export const ImageMessage = memo(function ImageMessage({
           <ImageLightbox
             url={url}
             label={meta.prompt}
-            caption={`${meta.prompt} — ${meta.width} × ${meta.height}`}
+            caption={`${meta.prompt}, ${meta.width} × ${meta.height}`}
             onClose={() => setAgrandie(false)}
           />
         )}

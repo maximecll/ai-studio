@@ -64,7 +64,7 @@ export function HomeView() {
     const body = message.trim()
     if (!body && !jointes.files.length) return
 
-    // En mode image, la conversation naît aussi — mais son premier échange est une description et une image, pas un tour de parole avec un modèle de…
+    // En mode image, la conversation naît aussi, mais son premier échange est une description et une image, pas un tour de parole avec un modèle de…
     if (image) {
       if (!body) return
       const id = await createConversation({ model, params: settings.defaultParams, system: settings.defaultSystem })

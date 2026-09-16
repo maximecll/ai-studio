@@ -1,11 +1,11 @@
-/** Recherche web — instance SearXNG locale, auto-hébergée.
+/** Recherche web, instance SearXNG locale, auto-hébergée.
  *
  * SearXNG est un métamoteur respectueux de la vie privée : il interroge
  * plusieurs moteurs et n'expose ni compte, ni clé, ni traçage. On l'installe
  * dans son propre environnement Python, on le lance en service local, et on
  * l'interroge en JSON. Les résultats sont glissés en tête du prompt, comme les
  * connaissances (RAG). Rien ne sort de la machine que les requêtes de recherche
- * elles-mêmes — et elles partent chez SearXNG, pas chez nous. */
+ * elles-mêmes, et elles partent chez SearXNG, pas chez nous. */
 import { spawn, spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
@@ -27,7 +27,7 @@ const SHIMS = join(DATA, 'shims')
 const READY = join(DATA, 'ready')
 
 /** SearXNG ne publie pas de versions : on suit master, comme le recommande le
-    projet — les moteurs de recherche changent, les correctifs suivent. */
+    projet, les moteurs de recherche changent, les correctifs suivent. */
 const REPO = 'https://github.com/searxng/searxng.git'
 const PORT = Number(process.env.STUDIO_SEARX_PORT ?? 8888)
 const BASE = `http://127.0.0.1:${PORT}`
@@ -163,7 +163,7 @@ def getpwall(): return [_e()]
 `
 
 function settingsYaml(secret) {
-  return `# Généré par AI Studio — ne pas modifier à la main.
+  return `# Généré par AI Studio, ne pas modifier à la main.
 use_default_settings: true
 
 general:

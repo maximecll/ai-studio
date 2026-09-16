@@ -17,7 +17,7 @@ import { MetalSend } from './MetalSend'
 import { href, navigate } from '../../lib/router'
 import { ImageControls, ModeToggle, useImageEngine } from './ImageControls'
 
-/** Sélecteur de modèle — placé là où l'on écrit, pas dans l'en-tête. */
+/** Sélecteur de modèle, placé là où l'on écrit, pas dans l'en-tête. */
 function ModelChip({ conv }: { conv: Conversation }) {
   const switchModel = useChat((s) => s.switchModel)
   const models = useModels((s) => s.models)
@@ -64,7 +64,7 @@ function ModelChip({ conv }: { conv: Conversation }) {
   )
 }
 
-/** Sélecteur de preset — même capsule, même hauteur, même graisse. */
+/** Sélecteur de preset, même capsule, même hauteur, même graisse. */
 function KnowledgeChip({ conv }: { conv: Conversation }) {
   const bases = useKnowledge((s) => s.bases)
   const refresh = useKnowledge((s) => s.refresh)
@@ -215,7 +215,7 @@ export function useComposerMode(conversationId: string) {
  * Les emplacements nommés viennent du ChatComposer d'Astryx, sans la
  * bibliothèque : elle pesait un tiers du paquet et restylait toute
  * l'application. La jauge de contexte, elle, reste au pied près du bouton
- * d'envoi — la remonter en en-tête lui donnait une ligne pour rien et
+ * d'envoi, la remonter en en-tête lui donnait une ligne pour rien et
  * désaccordait le mode texte du mode image.
  */
 function ComposerShell({
@@ -269,7 +269,7 @@ export function Composer({
   usedTokens: number
   hasMemory: boolean
   onSend: (text: string, files: File[]) => void
-  /** Envoi en mode image — la description part vers le moteur de diffusion. */
+  /** Envoi en mode image, la description part vers le moteur de diffusion. */
   onGenerate: (prompt: string, params: ImageParams) => void
   generating: boolean
   onStop: () => void
@@ -394,14 +394,14 @@ export function Composer({
                   hidden
                   onChange={(e) => { void jointes.add(e.target.files); e.target.value = '' }}
                 />
-                <Tooltip label="Joindre une image — ou la déposer ici, ou la coller" side="top">
+                <Tooltip label="Joindre une image, ou la déposer ici, ou la coller" side="top">
                   <Button size="icon-sm" onClick={() => fichierRef.current?.click()}>
                     <Paperclip className="size-4" />
                   </Button>
                 </Tooltip>
 
                 <Tooltip
-                  label={`${formatNumber(used)} jetons sur ${formatNumber(ctxMax)} — ${Math.round(filled * 100)} % du contexte`}
+                  label={`${formatNumber(used)} jetons sur ${formatNumber(ctxMax)}, ${Math.round(filled * 100)} % du contexte`}
                   side="top"
                 >
                   <span className="hidden items-center gap-2 pr-1 sm:flex">
@@ -443,7 +443,7 @@ export function Composer({
             aveugle ? (
               <p className="t-caption mt-2 flex items-start gap-2 px-1 text-caution">
                 <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-                {prettyModel(conversation.model ?? '')} ne lit pas les images — choisissez un modèle « vision ».
+                {prettyModel(conversation.model ?? '')} ne lit pas les images, choisissez un modèle « vision ».
               </p>
             ) : undefined
           }

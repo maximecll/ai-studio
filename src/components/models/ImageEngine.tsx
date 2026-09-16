@@ -1,4 +1,4 @@
-/** Moteur d'images — installation, poids, entretien. */
+/** Moteur d'images, installation, poids, entretien. */
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -62,7 +62,7 @@ function DiskProgress({ model }: { model: ImageModel }) {
     <div className="pt-3">
       <div className="flex items-center gap-3">
         <span className="t-caption min-w-0 flex-1 truncate text-fg-muted">
-          {model.downloading ? 'Téléchargement en cours' : 'Téléchargement interrompu — reprenable'}
+          {model.downloading ? 'Téléchargement en cours' : 'Téléchargement interrompu, reprenable'}
         </span>
         <span className="shrink-0 font-mono text-[11px] tabular-nums text-fg-subtle">
           {formatBytes(model.onDisk ?? 0)} / {formatBytes(model.bytes)}
@@ -113,7 +113,7 @@ function ModelRow({ model, first }: { model: ImageModel; first: boolean }) {
           <p className="t-caption mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-fg-subtle">
             <span className="font-mono">{formatBytes(model.bytes)}</span>
             {model.needsRam && (
-              <Tooltip label="Mémoire vive occupée pendant la génération — ce qui décide si le modèle tient sur la machine.">
+              <Tooltip label="Mémoire vive occupée pendant la génération, ce qui décide si le modèle tient sur la machine.">
                 <span className={cn('cursor-default font-mono', tooHeavy && 'text-negative')}>
                   {formatBytes(model.needsRam)} en mémoire
                 </span>
@@ -202,7 +202,7 @@ function Install() {
             {engine?.backend === 'diffusers'
               ? 'diffusers et PyTorch, avec la carte NVIDIA si elle est là, le processeur sinon'
               : 'mflux, le portage MLX de FLUX, qui tourne nativement sur la puce Apple'}
-            . L’installation crée un environnement Python à part, dans le dossier de l’application —
+            . L’installation crée un environnement Python à part, dans le dossier de l’application :
             {engine?.backend === 'diffusers' ? ' 3 à 5 Go' : ' environ 2 Go'}, sans rien toucher au reste du système.
             Python est déposé avec, si la machine n’en a pas.
           </p>
@@ -239,7 +239,7 @@ function Install() {
       {coupee && !installing && (
         <p className="t-caption mt-3 text-caution">
           Une installation précédente s’est arrêtée en chemin. Reprendre réutilise ce qui est déjà là ;
-          repartir de zéro efface l’environnement et le reconstruit — les modèles déjà téléchargés ne
+          repartir de zéro efface l’environnement et le reconstruit, les modèles déjà téléchargés ne
           sont pas touchés.
         </p>
       )}
@@ -266,7 +266,7 @@ function LoraRow({ lora, first }: { lora: LoraFile; first: boolean }) {
           {/* Déclaration du fichier, gardée pour information : elle est
               souvent fausse, et ne sert jamais à décider. */}
           {lora.architecture && lora.architecture !== lora.target && (
-            <Tooltip label="Déclaré dans les métadonnées du fichier. Souvent inexact — l’architecture retenue vient des noms de tenseurs.">
+            <Tooltip label="Déclaré dans les métadonnées du fichier. Souvent inexact, l’architecture retenue vient des noms de tenseurs.">
               <span className="cursor-default font-mono opacity-60">déclare {lora.architecture}</span>
             </Tooltip>
           )}
@@ -332,7 +332,7 @@ function LoraLibrary() {
 
       <footer className="border-t border-line px-5 py-3">
         <p className="t-caption text-fg-subtle">
-          L’architecture affichée est déduite des noms de tenseurs, pas des métadonnées — celles-ci sont
+          L’architecture affichée est déduite des noms de tenseurs, pas des métadonnées, celles-ci sont
           régulièrement fausses. La largeur distingue deux tailles d’un même modèle : un adaptateur Wan A14B
           et un Wan 5 B portent les mêmes noms de couches, seule la largeur les sépare.
           L’adaptateur s’applique à l’exécution, sans toucher au modèle : la mémoire ne bouge presque pas, et

@@ -74,7 +74,7 @@ export async function loraLibrary(): Promise<{ folder: string; items: LoraFile[]
   return (await req('/loras')).json()
 }
 
-/** Ouvre le dossier dans le Finder — déposer un fichier doit rester trivial. */
+/** Ouvre le dossier dans le Finder, déposer un fichier doit rester trivial. */
 export async function revealLoras(): Promise<void> {
   await req('/loras/reveal', { method: 'POST' })
 }
@@ -143,7 +143,7 @@ export async function removeModel(model: string): Promise<void> {
   })
 }
 
-/** Vide le cache de morceaux Xet — il se reconstitue au prochain téléchargement. */
+/** Vide le cache de morceaux Xet, il se reconstitue au prochain téléchargement. */
 export async function purgeChunkCache(): Promise<void> {
   await req('/remove', {
     method: 'POST',
@@ -171,7 +171,7 @@ export const RATIOS = [
 ] as const
 
 export const DEFINITIONS = [
-  { id: 'draft', label: 'Aperçu', px: 640, note: 'Le plus rapide — pour chercher une idée.' },
+  { id: 'draft', label: 'Aperçu', px: 640, note: 'Le plus rapide, pour chercher une idée.' },
   { id: 'standard', label: 'Standard', px: 1024, note: "La définition d'entraînement de FLUX." },
   { id: 'fine', label: 'Détail', px: 1280, note: 'Plus fin, nettement plus long.' },
 ] as const
@@ -232,7 +232,7 @@ export function loraFits(lora: LoraFile, model: ImageModel | undefined): boolean
   return null
 }
 
-/** Pourquoi un adaptateur ne convient pas — dit en une ligne. */
+/** Pourquoi un adaptateur ne convient pas, dit en une ligne. */
 export function loraMismatch(lora: LoraFile, model: ImageModel | undefined): string | null {
   if (!model || loraFits(lora, model) !== false) return null
   if (lora.target && model.loraTarget && lora.target !== model.loraTarget) {
@@ -241,7 +241,7 @@ export function loraMismatch(lora: LoraFile, model: ImageModel | undefined): str
   return `prévu pour une largeur ${lora.width}, ce modèle fait ${model.loraWidth}`
 }
 
-/** « ~4 min » — une estimation arrondie, jamais une promesse à la seconde. */
+/** « ~4 min », une estimation arrondie, jamais une promesse à la seconde. */
 export function roughly(ms: number): string {
   const min = ms / 60_000
   if (min < 1) return `~${Math.max(10, Math.round(ms / 10_000) * 10)} s`

@@ -154,7 +154,7 @@ export const ollama = {
     yield* ndjson<ChatChunk>(res, opts.signal)
   },
 
-  /** Génération courte non streamée — utilisée pour les titres automatiques. */
+  /** Génération courte non streamée, utilisée pour les titres automatiques. */
   async generate(model: string, prompt: string, params?: Params, signal?: AbortSignal): Promise<string> {
     const res = await req('/api/generate', {
       method: 'POST',

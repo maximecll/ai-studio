@@ -59,7 +59,7 @@ export interface LoraFile {
   bytes: number
   /** Architecture déclarée dans les métadonnées. */
   architecture?: string
-  /** Famille déduite des noms de tenseurs — fiable, c'est là-dessus qu'on tranche. */
+  /** Famille déduite des noms de tenseurs, fiable, c'est là-dessus qu'on tranche. */
   target?: string
   /** Largeur du modèle visé : ce qui sépare deux tailles d'une même famille. */
   width?: number
@@ -77,7 +77,7 @@ export interface ImageParams {
   model: string
   width: number
   height: number
-  /** Pas de débruitage. Plus il y en a, plus l'image se précise — et se paie. */
+  /** Pas de débruitage. Plus il y en a, plus l'image se précise, et se paie. */
   steps?: number
   /** Fidélité à la description. Sans effet sur schnell, qui n'a pas de branche de guidage. */
   guidance?: number
@@ -100,7 +100,7 @@ export interface ImageMeta {
   steps: number
   seed: number
   guidance?: number
-  /** LoRAs appliqués — avec la graine, c'est ce qui rend l'image reproductible. */
+  /** LoRAs appliqués, avec la graine, c'est ce qui rend l'image reproductible. */
   loras?: LoraChoice[]
   /** Durée totale, chargement du modèle compris. */
   ms: number
@@ -112,7 +112,7 @@ export interface Message {
   conversationId: string
   role: Role
   content: string
-  /** Image produite par diffusion — le message porte alors l'image, pas du texte. */
+  /** Image produite par diffusion, le message porte alors l'image, pas du texte. */
   image?: ImageMeta
   /** Réglages avec lesquels ce message a été envoyé au moteur de diffusion. */
   imageRequest?: ImageParams
@@ -141,7 +141,7 @@ export interface Attachment {
 export interface ImageBlob {
   id: string
   conversationId: string
-  /** Chiffré si la conversation est verrouillée — d'où `iv`. */
+  /** Chiffré si la conversation est verrouillée, d'où `iv`. */
   data: Blob
   sealed: 0 | 1
   iv?: string
@@ -165,11 +165,11 @@ export interface Conversation {
   archived: 0 | 1
   presetId: string | null
   autoTitled: 0 | 1
-  /** Vue de transcription — normale, réflexion, détaillée. */
+  /** Vue de transcription, normale, réflexion, détaillée. */
   transcript: Transcript
   /** Contenus chiffrés au repos, illisibles coffre fermé. */
   locked: 0 | 1
-  /** Réglages de diffusion propres à cette conversation — modèle, format, LoRAs. */
+  /** Réglages de diffusion propres à cette conversation, modèle, format, LoRAs. */
   imageParams?: ImageParams
   /** Bases de connaissances (RAG) auxquelles ce fil a accès. */
   knowledgeIds?: string[]
@@ -185,7 +185,7 @@ export interface Conversation {
 export interface Preset {
   id: string
   name: string
-  /** Clé du jeu d'icônes lucide — cf. lib/preset-icons. */
+  /** Clé du jeu d'icônes lucide, cf. lib/preset-icons. */
   icon: string
   description: string
   /** Modèle imposé par le preset, ou null = garder le modèle courant. */
@@ -249,7 +249,7 @@ export interface ImageModel {
   id: string
   /** Famille d'architecture : décide de la classe employée, et des LoRAs compatibles. */
   family: string
-  /** Moteur qui l'exécute — mflux, ou mlx-video pour les modèles vidéo. */
+  /** Moteur qui l'exécute, mflux, ou mlx-video pour les modèles vidéo. */
   runner: 'mflux' | 'mlx-video'
   name: string
   /** Niveau de quantification, tel qu'affiché à côté du nom. */
@@ -293,7 +293,7 @@ export interface ImageEngine {
   engine?: string
   /** mflux sur puce Apple, diffusers partout ailleurs. */
   backend?: 'mflux' | 'diffusers'
-  /** Appareil vu par PyTorch — seulement sur le chemin diffusers. */
+  /** Appareil vu par PyTorch, seulement sur le chemin diffusers. */
   torch?: { device: 'cuda' | 'mps' | 'cpu'; name: string | null; vram: number } | null
   python?: string
   cache?: string
@@ -355,7 +355,7 @@ export interface ChatChunk {
 export interface KnowledgeBase {
   id: string
   name: string
-  /** Modèle d'embedding utilisé — un vecteur n'est comparable qu'aux siens. */
+  /** Modèle d'embedding utilisé, un vecteur n'est comparable qu'aux siens. */
   embedModel: string
   /** Chiffrée : le texte des morceaux est illisible coffre fermé. */
   sealed: 0 | 1

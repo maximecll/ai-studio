@@ -1,4 +1,4 @@
-/** Recherche web — instance SearXNG locale, côté client.
+/** Recherche web, instance SearXNG locale, côté client.
  *
  * Le serveur héberge SearXNG ; ici on interroge, on met en forme pour le prompt,
  * et on suit l'installation. Les résultats sont cités comme les connaissances. */
@@ -66,7 +66,7 @@ export async function* installSearch(): AsyncGenerator<SearchEvent> {
 /** Met les résultats en forme pour le prompt, avec sources citables. */
 export function webContextBlock(results: WebResult[]): string {
   const corps = results
-    .map((r, i) => `[${i + 1}] ${r.title} — ${r.url}\n${r.content}`)
+    .map((r, i) => `[${i + 1}] ${r.title}\n${r.url}\n${r.content}`)
     .join('\n\n')
   return (
     'Résultats de recherche web (SearXNG). Appuie-toi dessus pour répondre à jour ' +

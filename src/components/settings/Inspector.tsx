@@ -110,7 +110,7 @@ function ImageSection({ params, onPatch }: { params: ImageParams; onPatch: (p: P
 
       <Field
         label="Définition"
-        hint={`${params.width} × ${params.height} — environ ${roughly(estimate(steps, params.width, params.height, model?.msPerStep768, model?.loadMs))} par image sur cette machine.`}
+        hint={`${params.width} × ${params.height}, environ ${roughly(estimate(steps, params.width, params.height, model?.msPerStep768, model?.loadMs))} par image sur cette machine.`}
       >
         <Dropdown
           value={def.id}
@@ -120,7 +120,7 @@ function ImageSection({ params, onPatch }: { params: ImageParams; onPatch: (p: P
           }}
           options={DEFINITIONS.map((d) => {
             const size = dimensions(ratio, d)
-            return { value: d.id, label: d.label, hint: `${size.width} × ${size.height} — ${d.note}` }
+            return { value: d.id, label: d.label, hint: `${size.width} × ${size.height}, ${d.note}` }
           })}
         />
       </Field>
@@ -134,7 +134,7 @@ function ImageSection({ params, onPatch }: { params: ImageParams; onPatch: (p: P
           max={model.steps.max}
           step={1}
           onChange={(v) => set({ steps: v })}
-          hint="Chaque pas affine l'image. Au-delà d'une vingtaine, le gain devient difficile à voir — le temps, lui, continue de monter."
+          hint="Chaque pas affine l'image. Au-delà d'une vingtaine, le gain devient difficile à voir, le temps, lui, continue de monter."
         />
       )}
 
@@ -205,7 +205,7 @@ export interface InspectorTarget {
   system: string
   params: Params
   think?: boolean
-  /** Réglages de diffusion de la même cible — conversation, ou valeurs par défaut. */
+  /** Réglages de diffusion de la même cible, conversation, ou valeurs par défaut. */
   imageParams?: ImageParams
 }
 
@@ -392,9 +392,9 @@ function Inspector({
               <dl className="space-y-2.5 text-[13px]">
                 {([
                   ['Nom', prettyModel(model.name)],
-                  ['Famille', model.details?.family ?? '—'],
-                  ['Paramètres', model.details?.parameter_size ?? '—'],
-                  ['Quantisation', model.details?.quantization_level ?? '—'],
+                  ['Famille', model.details?.family ?? '-'],
+                  ['Paramètres', model.details?.parameter_size ?? '-'],
+                  ['Quantisation', model.details?.quantization_level ?? '-'],
                   ['Contexte max', formatNumber(model.details?.context_length ?? 0)],
                   ['Taille sur disque', formatBytes(model.size)],
                 ] as const).map(([k, v]) => (

@@ -3,7 +3,7 @@ import { Home, SearchX } from 'lucide-react'
 import { href, navigate } from '../lib/router'
 import { Button } from './ui/primitives'
 
-/** 404 — identifiant de conversation inconnu ou chemin inexistant. */
+/** 404, identifiant de conversation inconnu ou chemin inexistant. */
 export function NotFound({ path }: { path: string }) {
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center px-6">

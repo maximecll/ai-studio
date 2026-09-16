@@ -6,7 +6,7 @@ import { PRESET_ICON_KEYS, PresetGlyph } from '../../lib/preset-icons'
 import { toast } from '../../store/ui'
 import { Button, Field, Input, Modal, Switch, Textarea } from '../ui/primitives'
 
-/** Sélecteur d'icône — jeu fermé, une seule bibliothèque. */
+/** Sélecteur d'icône, jeu fermé, une seule bibliothèque. */
 export function IconPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="flex flex-wrap gap-1.5">

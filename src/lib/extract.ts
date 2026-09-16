@@ -1,4 +1,4 @@
-/** Extraction du texte d'un fichier — texte brut ou PDF. */
+/** Extraction du texte d'un fichier, texte brut ou PDF. */
 
 /** Le PDF est chargé à la demande : ~1 Mo de pdf.js hors du bundle principal. */
 async function extractPdf(file: File): Promise<string> {

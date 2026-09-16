@@ -17,7 +17,7 @@ const RUNTIME = join(ROOT, '.runtime')
 const OLLAMA_DIR = join(RUNTIME, 'ollama')
 const VERSION = 'v0.34.0'
 
-/* Git portable — Windows uniquement : c'est le seul des trois systèmes à ne
+/* Git portable, Windows uniquement : c'est le seul des trois systèmes à ne
    pas livrer git, et le seul à publier une archive utilisable sans droit
    administrateur. */
 const GIT_DIR = join(RUNTIME, 'git')
@@ -80,7 +80,7 @@ async function pathBinary() {
   }
 }
 
-/** Binaire utilisable, avec sa provenance — l'interface en a besoin pour
+/** Binaire utilisable, avec sa provenance, l'interface en a besoin pour
     proposer un démarrage plutôt qu'un téléchargement de 1,5 Go. */
 async function findOllama() {
   const portable = localBinary()

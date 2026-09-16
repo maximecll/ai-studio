@@ -355,7 +355,7 @@ export async function deleteImage(id: string): Promise<void> {
   await db.images.delete(id)
 }
 
-/** Octets occupés par les images — pour le panneau de stockage. */
+/** Octets occupés par les images, pour le panneau de stockage. */
 export async function imagesWeight(): Promise<{ count: number; bytes: number }> {
   let bytes = 0
   let count = 0
@@ -369,7 +369,7 @@ export async function messagesOf(conversationId: string): Promise<Message[]> {
   return Promise.all(raw.map(openMessage))
 }
 
-/** Lecture brute, sans déchiffrement — pour les manipulations de structure. */
+/** Lecture brute, sans déchiffrement, pour les manipulations de structure. */
 export function rawMessagesOf(conversationId: string): Promise<Message[]> {
   return db.messages.where('conversationId').equals(conversationId).sortBy('createdAt')
 }
@@ -401,7 +401,7 @@ export async function deleteMessage(id: string): Promise<void> {
   await db.messages.delete(id)
 }
 
-/** Supprime tout ce qui suit un message — utilisé pour régénérer / éditer. */
+/** Supprime tout ce qui suit un message, utilisé pour régénérer / éditer. */
 export async function deleteMessagesFrom(conversationId: string, createdAt: number, inclusive = false): Promise<void> {
   const all = await messagesOf(conversationId)
   const doomed = all.filter((m) => (inclusive ? m.createdAt >= createdAt : m.createdAt > createdAt))

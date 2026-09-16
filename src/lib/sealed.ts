@@ -91,7 +91,7 @@ export async function openChunkText(text: string): Promise<string | null> {
   return openText(master, text)
 }
 
-/** Vrai si le contenu est illisible en l'état — coffre fermé. */
+/** Vrai si le contenu est illisible en l'état, coffre fermé. */
 export function isOpaque(msg: Message): boolean {
   return isSealed(msg.content) && !master
 }

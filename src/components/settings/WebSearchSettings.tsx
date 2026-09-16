@@ -47,7 +47,7 @@ export function WebSearchSettings() {
         <p className="t-caption flex items-start gap-2 rounded-sm bg-surface-2 px-3 py-2.5 text-fg-muted">
           <Globe className="mt-0.5 size-4 shrink-0 text-fg-subtle" />
           <span className="min-w-0">
-            Pas encore installée. L’installation télécharge Python (si absent) et SearXNG — comptez quelques
+            Pas encore installée. L’installation télécharge Python (si absent) et SearXNG, comptez quelques
             minutes et ≈ 200 Mo.
           </span>
         </p>

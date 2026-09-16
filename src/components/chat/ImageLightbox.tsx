@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
 
-/** Aperçu plein écran — pièces jointes comme images produites. */
+/** Aperçu plein écran, pièces jointes comme images produites. */
 export function ImageLightbox({
   url, label, caption, onClose,
 }: {

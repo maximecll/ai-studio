@@ -141,9 +141,9 @@ export function SettingsView() {
             <Dropdown
               value={settings.defaultModel}
               onChange={(v) => void patchSettings({ defaultModel: v })}
-              placeholder="— Aucun —"
+              placeholder="Aucun"
               options={[
-                { value: '', label: '— Aucun —' },
+                { value: '', label: 'Aucun' },
                 ...models.map((m) => ({ value: m.name, label: prettyModel(m.name), hint: m.details?.parameter_size })),
               ]}
             />

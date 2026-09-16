@@ -1,4 +1,4 @@
-/** Amorçage Python partagé — génération d'images comme recherche web.
+/** Amorçage Python partagé, génération d'images comme recherche web.
  *
  * Déposer un interpréteur, créer un environnement, l'utiliser : la même
  * mécanique sert à plusieurs outils. Elle vit ici, une seule fois. */
@@ -73,7 +73,7 @@ export async function hostPython() {
 
 /** Dépose un interpréteur complet dans `.runtime/python`, sans installateur
     ni droit administrateur : c'est le seul moyen d'aller au bout sur une
-    machine qui n'a pas Python — le cas courant sous Windows. */
+    machine qui n'a pas Python, le cas courant sous Windows. */
 export async function installPython(send, log) {
   const cible = pythonCible()
   if (!cible) throw new Error(`Système non pris en charge pour Python : ${platform()} ${arch()}.`)
