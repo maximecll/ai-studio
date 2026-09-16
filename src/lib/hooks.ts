@@ -107,6 +107,24 @@ export function useMediaQuery(query: string): boolean {
   return match
 }
 
+/** Connexion Internet de la machine. `navigator.onLine` passe à faux dès que
+    le système perd le réseau — de quoi bloquer la recherche web, qui a besoin
+    d'Internet pour interroger les moteurs. */
+export function useOnline(): boolean {
+  const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine)
+  useEffect(() => {
+    const on = () => setOnline(true)
+    const off = () => setOnline(false)
+    window.addEventListener('online', on)
+    window.addEventListener('offline', off)
+    return () => {
+      window.removeEventListener('online', on)
+      window.removeEventListener('offline', off)
+    }
+  }, [])
+  return online
+}
+
 export interface SystemMemory {
   total: number
   available: number

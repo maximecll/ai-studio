@@ -10,6 +10,7 @@ import { useModels } from '../../store/models'
 import { toast } from '../../store/ui'
 import { Page } from '../layout/Page'
 import { UpdateSettings } from './UpdateSettings'
+import { WebSearchSettings } from './WebSearchSettings'
 import { Button, ConfirmModal, Dropdown, Field, Input, Switch, Textarea } from '../ui/primitives'
 
 const TRANSCRIPTS: Array<{ value: Transcript; label: string }> = [
@@ -169,6 +170,10 @@ export function SettingsView() {
               </p>
             )}
           </Field>
+        </Group>
+
+        <Group title="Recherche web">
+          <WebSearchSettings />
         </Group>
 
         <Group title="Mises à jour">

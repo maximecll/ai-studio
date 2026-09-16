@@ -173,6 +173,8 @@ export interface Conversation {
   imageParams?: ImageParams
   /** Bases de connaissances (RAG) auxquelles ce fil a accès. */
   knowledgeIds?: string[]
+  /** Recherche web : le fil consulte SearXNG avant de répondre. */
+  webSearch?: boolean
   /** Mémo Markdown alimenté au fil de la conversation. */
   memory: string
   memoryUpdatedAt: number | null

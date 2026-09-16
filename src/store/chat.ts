@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { ollama, OllamaError } from '../lib/ollama'
 import { imagesOf, storeAttachments } from '../lib/attachments'
 import { contextBlock, retrieve } from '../lib/rag'
+import { webContextBlock, webSearch } from '../lib/websearch'
 import {
   addMessage, db, deleteMessagesFrom, getSettings, messagesOf, updateConversation, updateMessage,
 } from '../lib/db'
@@ -182,22 +183,30 @@ export const useChat = create<ChatState>((set, get) => {
 
     const payload: Array<Pick<Message, 'role' | 'content'> & { images?: string[] }> = []
 
-    /* RAG : le contexte des bases actives, retrouvé à partir de la dernière
-       question et glissé en tête. Un modèle d'embedding absent ne bloque rien. */
+    /* RAG et recherche web : deux sources de contexte tirées de la dernière
+       question et glissées en tête. Une source indisponible ne bloque rien. */
+    const lastUser = [...history].reverse().find((m) => m.role === 'user' && !m.error && !m.folded)
     let ragBlock = ''
-    if (conv.knowledgeIds?.length) {
-      const lastUser = [...history].reverse().find((m) => m.role === 'user' && !m.error && !m.folded)
-      if (lastUser?.content.trim()) {
-        try {
-          const passages = await retrieve(lastUser.content, conv.knowledgeIds)
-          if (passages.length) ragBlock = contextBlock(passages)
-        } catch { /* embeddings indisponibles : on répond sans contexte */ }
-      }
+    if (conv.knowledgeIds?.length && lastUser?.content.trim()) {
+      try {
+        const passages = await retrieve(lastUser.content, conv.knowledgeIds)
+        if (passages.length) ragBlock = contextBlock(passages)
+      } catch { /* embeddings indisponibles : on répond sans contexte */ }
+    }
+
+    let webBlock = ''
+    // Hors ligne, la recherche est bloquée : SearXNG ne pourrait rien interroger.
+    if (conv.webSearch && navigator.onLine && lastUser?.content.trim()) {
+      try {
+        const results = await webSearch(lastUser.content)
+        if (results.length) webBlock = webContextBlock(results)
+      } catch { /* SearXNG injoignable : on répond sans le web */ }
     }
 
     const preamble = [
       conv.system.trim(),
       ragBlock,
+      webBlock,
       conv.memory.trim() ? memoryBlock(conv.memory) : '',
     ].filter(Boolean).join('\n\n')
     if (preamble) payload.push({ role: 'system', content: preamble })

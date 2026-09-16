@@ -6,8 +6,9 @@ import { arch, homedir, platform, totalmem } from 'node:os'
 import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
-import { download, PS_UTF8 } from './setup.mjs'
+import { PS_UTF8 } from './setup.mjs'
 import { attach, isRunning, start } from './tasks.mjs'
+import { ENV_UTF8, hostPython, installPython, RUNTIME, venvPython } from './python.mjs'
 import { promisify } from 'node:util'
 
 const execute = promisify(execFile)
@@ -21,17 +22,7 @@ const WORKER = join(ROOT, 'scripts', 'flux_worker.py')
 
 /** Environnement Python dédié : le moteur d'images n'a rien à faire ailleurs. */
 const VENV = process.env.STUDIO_IMAGES_VENV ?? join(ROOT, '.venv-images')
-
-/* Python embarqué, quand la machine n'en a pas. Les archives
-   `python-build-standalone` sont relogeables et se déplient sans installateur :
-   même principe que Node.js et Ollama. */
-const RUNTIME = join(ROOT, '.runtime')
-const PY_DIR = join(RUNTIME, 'python')
-const PY_TAG = '20260901'
-const PY_VERSION = '3.12.14'
-const PYTHON = platform() === 'win32'
-  ? join(VENV, 'Scripts', 'python.exe')
-  : join(VENV, 'bin', 'python')
+const PYTHON = venvPython(VENV)
 
 /** Les images fraîches attendent ici que l'interface vienne les chercher. */
 const STAGING = join(homedir(), '.studio', 'images')
@@ -536,16 +527,6 @@ export function engineInstalled() {
 }
 
 /** Lance le worker et transforme ses lignes NDJSON en appels à `onEvent`. */
-/** Sous Windows, les outils suivent la page de codes héritée s'ils ne sont pas
-    forcés : les accents ressortent alors illisibles. */
-const ENV_UTF8 = {
-  ...process.env,
-  PYTHONUNBUFFERED: '1',
-  PYTHONIOENCODING: 'utf-8',
-  // Mode UTF-8 complet : couvre aussi les chemins de fichiers accentués.
-  PYTHONUTF8: '1',
-}
-
 function runWorker(command, job, onEvent) {
   const child = spawn(PYTHON, [WORKER, command], {
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -600,75 +581,6 @@ let generating = null
 const pulls = new Map()
 
 /* ── Installation du moteur ──────────────────────────────────────── */
-
-function pythonCible() {
-  const a = arch() === 'arm64' ? 'aarch64' : 'x86_64'
-  switch (platform()) {
-    case 'win32': return `${a}-pc-windows-msvc`
-    case 'darwin': return `${a}-apple-darwin`
-    case 'linux': return `${a}-unknown-linux-gnu`
-    default: return null
-  }
-}
-
-function pythonEmbarque() {
-  const p = platform() === 'win32' ? join(PY_DIR, 'python.exe') : join(PY_DIR, 'bin', 'python3')
-  return existsSync(p) ? p : null
-}
-
-/** Interpréteur hôte : celui qu'on a déposé d'abord, celui du système ensuite. */
-async function hostPython() {
-  const embarque = pythonEmbarque()
-  if (embarque) return { cmd: embarque, prefixe: [], version: PY_VERSION }
-
-  const essais = platform() === 'win32'
-    ? [['py', ['-3']], ['python', []], ['python3', []]]
-    : [['python3', []], ['python', []]]
-  for (const [cmd, prefixe] of essais) {
-    try {
-      const { stdout } = await execute(cmd, [...prefixe, '-c', 'import sys;print("%d.%d"%sys.version_info[:2])'], { timeout: 10000 })
-      const [majeure, mineure] = stdout.trim().split('.').map(Number)
-      if (majeure === 3 && mineure >= 10) return { cmd, prefixe, version: stdout.trim() }
-    } catch { /* on essaie le suivant */ }
-  }
-  return null
-}
-
-/** Dépose un interpréteur complet dans `.runtime/python`, sans installateur
-    ni droit administrateur : c'est le seul moyen d'aller au bout sur une
-    machine qui n'a pas Python — le cas courant sous Windows. */
-async function installPython(send, log) {
-  const cible = pythonCible()
-  if (!cible) throw new Error(`Système non pris en charge pour Python : ${platform()} ${arch()}.`)
-
-  const nom = `cpython-${PY_VERSION}+${PY_TAG}-${cible}-install_only.tar.gz`
-  const url = `https://github.com/astral-sh/python-build-standalone/releases/download/${PY_TAG}/${nom}`
-  await mkdir(RUNTIME, { recursive: true })
-  const archive = join(RUNTIME, nom)
-
-  send({ type: 'phase', phase: 'install', label: `Téléchargement de Python ${PY_VERSION}` })
-  const t0 = Date.now()
-  await download(url, archive, (completed, total) => {
-    const speed = completed / Math.max(0.001, (Date.now() - t0) / 1000)
-    send({
-      type: 'progress',
-      phase: 'downloading',
-      completed,
-      total,
-      speed,
-      eta: speed > 1 && total ? (total - completed) / speed : null,
-    })
-  })
-
-  send({ type: 'phase', phase: 'install', label: 'Installation de Python' })
-  await rm(PY_DIR, { recursive: true, force: true })
-  // L'archive contient un dossier `python/` : on la déplie dans `.runtime`.
-  await execute('tar', ['-xzf', archive, '-C', RUNTIME], { timeout: 900000, maxBuffer: 8 << 20 })
-  await rm(archive, { force: true })
-
-  if (!pythonEmbarque()) throw new Error("L'archive Python ne contient pas l'interpréteur attendu.")
-  log(`Python ${PY_VERSION} déposé dans .runtime/python`)
-}
 
 /** Une carte NVIDIA change la roue PyTorch à installer — et tout le reste. */
 async function hasNvidia() {

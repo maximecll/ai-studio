@@ -9,6 +9,7 @@ import { handle as handleBlobs } from './server/blobs.mjs'
 import { handle as handleMemory } from './server/system.mjs'
 import { handle as handleImages } from './server/images.mjs'
 import { ensureOllama, handle as handleSetup, stopOllama } from './server/setup.mjs'
+import { handle as handleSearch, stopSearx } from './server/searx.mjs'
 import { handle as handleUpdate } from './server/update.mjs'
 import { routes as taskRoutes, start as startTask } from './server/tasks.mjs'
 import { pullModel } from './server/pull.mjs'
@@ -111,6 +112,7 @@ function handle(req, res) {
   if (req.url.startsWith('/maintenance/memory')) return void handleMemory(req, res)
   if (req.url.startsWith('/images/')) return void handleImages(req, res)
   if (req.url.startsWith('/setup/')) return void handleSetup(req, res)
+  if (req.url.startsWith('/search/')) return void handleSearch(req, res)
   if (req.url.startsWith('/update/')) return void handleUpdate(req, res)
   if (req.url === '/tasks' || req.url.startsWith('/tasks/')) return void handleTasks(req, res)
 
@@ -156,6 +158,7 @@ server.listen(PORT, HOST, async () => {
 for (const signal of ['exit', 'SIGHUP', 'SIGINT', 'SIGTERM']) {
   process.on(signal, () => {
     stopOllama()
+    stopSearx()
     if (signal !== 'exit') process.exit(0)
   })
 }
