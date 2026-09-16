@@ -171,6 +171,8 @@ export interface Conversation {
   locked: 0 | 1
   /** Réglages de diffusion propres à cette conversation — modèle, format, LoRAs. */
   imageParams?: ImageParams
+  /** Bases de connaissances (RAG) auxquelles ce fil a accès. */
+  knowledgeIds?: string[]
   /** Mémo Markdown alimenté au fil de la conversation. */
   memory: string
   memoryUpdatedAt: number | null
@@ -344,4 +346,28 @@ export interface ChatChunk {
   prompt_eval_duration?: number
   eval_count?: number
   eval_duration?: number
+}
+
+/* ── Connaissances (RAG) ──────────────────────────────────────────── */
+
+export interface KnowledgeBase {
+  id: string
+  name: string
+  /** Modèle d'embedding utilisé — un vecteur n'est comparable qu'aux siens. */
+  embedModel: string
+  createdAt: number
+  updatedAt: number
+}
+
+/** Un morceau de document, avec son vecteur unitaire (comparaison = produit scalaire). */
+export interface Chunk {
+  id: string
+  knowledgeId: string
+  docId: string
+  docName: string
+  /** Rang du morceau dans le document. */
+  index: number
+  text: string
+  vector: number[]
+  createdAt: number
 }

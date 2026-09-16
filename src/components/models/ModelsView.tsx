@@ -230,7 +230,6 @@ export function ModelsView() {
           )}
         </>
       }
-      width="max-w-6xl"
       actions={
         <>
           {version && <span className="font-mono text-[12px] text-fg-subtle">Ollama v{version}</span>}

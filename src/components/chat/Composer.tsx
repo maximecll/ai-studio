@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Brain, Check, ChevronDown, Circle, Image as ImageIcon, Paperclip, Send, Square, TriangleAlert } from 'lucide-react'
+import { Brain, Check, ChevronDown, Circle, Image as ImageIcon, Library, Paperclip, Send, Square, TriangleAlert } from 'lucide-react'
 import { imageParamsOf, updateConversation } from '../../lib/db'
 import { usePresets } from '../../lib/hooks'
 import type { Conversation, ImageParams, Settings } from '../../lib/types'
@@ -8,6 +8,7 @@ import { hasCapability, prettyModel } from '../../lib/ollama'
 import { PresetGlyph } from '../../lib/preset-icons'
 import { findModel, useModels } from '../../store/models'
 import { useChat } from '../../store/chat'
+import { useKnowledge } from '../../store/knowledge'
 import { Button, Chip, Menu, MenuItem, MenuLabel, MenuSeparator, MorphButton, Tooltip } from '../ui/primitives'
 import { useAttachments } from '../../lib/attachments'
 import { PendingStrip } from './Attachments'
@@ -63,6 +64,49 @@ function ModelChip({ conv }: { conv: Conversation }) {
 }
 
 /** Sélecteur de preset — même capsule, même hauteur, même graisse. */
+function KnowledgeChip({ conv }: { conv: Conversation }) {
+  const bases = useKnowledge((s) => s.bases)
+  const refresh = useKnowledge((s) => s.refresh)
+  useEffect(() => { void refresh() }, [refresh])
+
+  const active = conv.knowledgeIds ?? []
+  if (!bases.length) return null
+
+  const toggle = (id: string) => {
+    const next = active.includes(id) ? active.filter((x) => x !== id) : [...active, id]
+    void updateConversation(conv.id, { knowledgeIds: next })
+  }
+  const n = active.filter((id) => bases.some((b) => b.id === id)).length
+
+  return (
+    <Menu
+      side="top"
+      width="w-64"
+      trigger={({ open }) => (
+        <Chip as="span" active={open || n > 0} className="min-w-0 shrink">
+          <Library className="size-3.5 shrink-0" />
+          <span className="max-w-28 truncate">{n > 0 ? `${n} base${n > 1 ? 's' : ''}` : 'Connaissances'}</span>
+          <ChevronDown className="size-3.5 shrink-0 text-fg-subtle" />
+        </Chip>
+      )}
+    >
+      <MenuLabel>Bases actives dans ce fil</MenuLabel>
+      {bases.map((b) => (
+        <MenuItem
+          key={b.id}
+          active={active.includes(b.id)}
+          icon={active.includes(b.id) ? <Check className="size-4 text-fg" /> : <Circle className="size-4" />}
+          onClick={() => toggle(b.id)}
+        >
+          {b.name}
+        </MenuItem>
+      ))}
+      <MenuSeparator />
+      <MenuItem onClick={() => navigate(href.knowledge())}>Gérer les connaissances…</MenuItem>
+    </Menu>
+  )
+}
+
 function PresetChip({ conv }: { conv: Conversation }) {
   const presets = usePresets()
   const current = presets.find((p) => p.id === conv.presetId)
@@ -284,6 +328,7 @@ export function Composer({
                 <>
                   <ModelChip conv={conversation} />
                   <PresetChip conv={conversation} />
+                  <KnowledgeChip conv={conversation} />
                   {hasMemory && (
                     <Tooltip label="Une mémoire résume les échanges anciens de cette conversation" side="top">
                       <span className="flex size-8 shrink-0 items-center justify-center rounded-full text-fg-subtle">

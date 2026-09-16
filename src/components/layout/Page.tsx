@@ -6,7 +6,7 @@ import { Button } from '../ui/primitives'
 
 /** Coque commune aux pages plein écran : Modèles, Réglages, Presets. */
 export function Page({
-  title, subtitle, actions, children, width = 'max-w-5xl',
+  title, subtitle, actions, children, width = '',
 }: {
   title: string
   subtitle?: ReactNode
@@ -26,7 +26,7 @@ export function Page({
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto scroll-thin">
-        <div className={cn('mx-auto w-full px-6 py-8', width)}>{children}</div>
+        <div className={cn('w-full px-6 py-8', width)}>{children}</div>
       </div>
     </div>
   )

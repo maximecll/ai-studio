@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { ollama, OllamaError } from '../lib/ollama'
 import { imagesOf, storeAttachments } from '../lib/attachments'
+import { contextBlock, retrieve } from '../lib/rag'
 import {
   addMessage, db, deleteMessagesFrom, getSettings, messagesOf, updateConversation, updateMessage,
 } from '../lib/db'
@@ -181,8 +182,22 @@ export const useChat = create<ChatState>((set, get) => {
 
     const payload: Array<Pick<Message, 'role' | 'content'> & { images?: string[] }> = []
 
+    /* RAG : le contexte des bases actives, retrouvé à partir de la dernière
+       question et glissé en tête. Un modèle d'embedding absent ne bloque rien. */
+    let ragBlock = ''
+    if (conv.knowledgeIds?.length) {
+      const lastUser = [...history].reverse().find((m) => m.role === 'user' && !m.error && !m.folded)
+      if (lastUser?.content.trim()) {
+        try {
+          const passages = await retrieve(lastUser.content, conv.knowledgeIds)
+          if (passages.length) ragBlock = contextBlock(passages)
+        } catch { /* embeddings indisponibles : on répond sans contexte */ }
+      }
+    }
+
     const preamble = [
       conv.system.trim(),
+      ragBlock,
       conv.memory.trim() ? memoryBlock(conv.memory) : '',
     ].filter(Boolean).join('\n\n')
     if (preamble) payload.push({ role: 'system', content: preamble })

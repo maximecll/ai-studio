@@ -70,6 +70,16 @@ export const ollama = {
     return (await res.json()).models ?? []
   },
 
+  /** Vecteurs d'embedding. `input` peut être une chaîne ou un lot de chaînes. */
+  async embed(model: string, input: string | string[]): Promise<number[][]> {
+    const res = await req('/api/embed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, input }),
+    })
+    return (await res.json()).embeddings ?? []
+  },
+
   async show(model: string): Promise<Record<string, unknown>> {
     const res = await req('/api/show', {
       method: 'POST',

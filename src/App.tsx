@@ -22,6 +22,7 @@ import { MemoryModal } from './components/chat/MemoryModal'
 import { VaultModal } from './components/settings/VaultModal'
 import { SettingsView } from './components/settings/SettingsView'
 import { PresetsView } from './components/settings/PresetsView'
+import { KnowledgeView } from './components/knowledge/KnowledgeView'
 import { CommandPalette } from './components/ui/CommandPalette'
 import { ShortcutsModal } from './components/ui/ShortcutsModal'
 import { Toasts } from './components/ui/Toasts'
@@ -142,6 +143,7 @@ export function App() {
       {route.name === 'models' && <View k="models"><ModelsView /></View>}
       {route.name === 'settings' && <View k="settings"><SettingsView /></View>}
       {route.name === 'presets' && <View k="presets"><PresetsView /></View>}
+      {route.name === 'knowledge' && <View k="knowledge"><KnowledgeView /></View>}
       {route.name === 'notfound' && <View k="404"><NotFound path={route.path} /></View>}
 
       {route.name === 'conversation' && (

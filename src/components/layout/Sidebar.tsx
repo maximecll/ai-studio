@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
-  Boxes, Copy, Download, FileJson, Lock, LockOpen, MoreHorizontal, PanelLeft, Pencil, Pin,
+  Boxes, Copy, Download, FileJson, Library, Lock, LockOpen, MoreHorizontal, PanelLeft, Pencil, Pin,
   PinOff, Plus, Search, Settings as SettingsIcon, Sparkles, Trash2, X,
 } from 'lucide-react'
 import {
@@ -298,6 +298,10 @@ export function Sidebar() {
           trailing={modelCount ? <span className="font-mono text-[11px] text-fg-subtle">{modelCount}</span> : undefined}
         />
         <NavRow icon={<Sparkles className="size-4" />} label="Presets" onClick={() => navigate(href.presets())} />
+        <NavRow
+          icon={<Library className="size-4" />} label="Connaissances" active={route.name === 'knowledge'}
+          onClick={() => navigate(href.knowledge())}
+        />
         <NavRow
           icon={vault.unlocked ? <LockOpen className="size-4" /> : <Lock className="size-4" />}
           label="Coffre"

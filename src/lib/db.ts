@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Conversation, Folder, ImageBlob, ImageParams, Message, Params, Preset, Settings } from './types'
+import type { Chunk, Conversation, Folder, ImageBlob, ImageParams, KnowledgeBase, Message, Params, Preset, Settings } from './types'
 import type { Vault } from './crypto'
 import { fullDate, uid } from './utils'
 import { hasMaster, openConversation, openImage, openMessage, sealConversation, sealImage, sealMessage, setMaster } from './sealed'
@@ -13,6 +13,8 @@ class StudioDB extends Dexie {
   settings!: EntityTable<Settings, 'id'>
   vault!: EntityTable<Vault, 'id'>
   images!: EntityTable<ImageBlob, 'id'>
+  knowledge!: EntityTable<KnowledgeBase, 'id'>
+  chunks!: EntityTable<Chunk, 'id'>
 
   constructor() {
     super('ollama-studio')
@@ -84,6 +86,19 @@ class StudioDB extends Dexie {
         if (s.keepAlive === '-1') s.keepAlive = '1h'
       }),
     )
+
+    // v8 : bases de connaissances (RAG) et leurs morceaux vectorisés.
+    this.version(8).stores({
+      conversations: 'id, updatedAt, createdAt, pinned, folderId, archived, locked, *tags',
+      messages: 'id, conversationId, createdAt, [conversationId+createdAt]',
+      presets: 'id, name, createdAt',
+      folders: 'id, order, name',
+      settings: 'id',
+      vault: 'id',
+      images: 'id, conversationId, createdAt',
+      knowledge: 'id, name, createdAt',
+      chunks: 'id, knowledgeId, docId',
+    })
   }
 }
 
