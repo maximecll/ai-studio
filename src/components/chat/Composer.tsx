@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Brain, Check, ChevronDown, Circle, Globe, Image as ImageIcon, Library, Paperclip, Send, Square, TriangleAlert } from 'lucide-react'
+import { Brain, Check, ChevronDown, Circle, Image as ImageIcon, Library, Paperclip, Send, Square, TriangleAlert } from 'lucide-react'
 import { imageParamsOf, updateConversation } from '../../lib/db'
-import { useOnline, usePresets } from '../../lib/hooks'
+import { usePresets } from '../../lib/hooks'
 import type { Conversation, ImageParams, Settings } from '../../lib/types'
 import { cn, estimateTokens, formatCompact, formatNumber, modKey } from '../../lib/utils'
 import { hasCapability, prettyModel } from '../../lib/ollama'
@@ -9,13 +9,13 @@ import { PresetGlyph } from '../../lib/preset-icons'
 import { findModel, useModels } from '../../store/models'
 import { useChat } from '../../store/chat'
 import { useKnowledge } from '../../store/knowledge'
-import { useSearch } from '../../store/search'
 import { Button, Chip, Menu, MenuItem, MenuLabel, MenuSeparator, MorphButton, Tooltip } from '../ui/primitives'
 import { useAttachments } from '../../lib/attachments'
 import { PendingStrip } from './Attachments'
 import { MetalSend } from './MetalSend'
 import { href, navigate } from '../../lib/router'
 import { ImageControls, ModeToggle, useImageEngine } from './ImageControls'
+import { WebSearchToggle } from './WebSearchToggle'
 
 /** Sélecteur de modèle, placé là où l'on écrit, pas dans l'en-tête. */
 function ModelChip({ conv }: { conv: Conversation }) {
@@ -108,44 +108,13 @@ function KnowledgeChip({ conv }: { conv: Conversation }) {
   )
 }
 
-/** Bascule « Recherche web » : le fil consulte SearXNG avant de répondre.
-    Tant que rien n'est installé, le clic mène aux Réglages plutôt que d'activer.
-    Hors ligne, la bascule est bloquée : la recherche a besoin d'Internet. */
+/** Bascule « Recherche web » du fil : l'état vit dans la conversation. */
 function WebSearchChip({ conv }: { conv: Conversation }) {
-  const status = useSearch((s) => s.status)
-  const refresh = useSearch((s) => s.refresh)
-  const online = useOnline()
-  useEffect(() => { void refresh() }, [refresh])
-
-  const installed = !!status?.installed
-  const on = !!conv.webSearch
-  const bloque = !online
-
-  const clic = () => {
-    if (bloque) return
-    if (!installed) return navigate(href.settings())
-    void updateConversation(conv.id, { webSearch: !on })
-  }
-
-  const infobulle = bloque
-    ? 'Recherche web indisponible hors ligne'
-    : installed
-      ? (on ? 'Recherche web active' : 'Activer la recherche web')
-      : 'Installer la recherche web (Réglages)'
-
   return (
-    <Tooltip label={infobulle}>
-      <Chip
-        as="button"
-        active={on && !bloque}
-        onClick={clic}
-        aria-disabled={bloque}
-        className={cn('min-w-0 shrink-0', bloque && 'cursor-not-allowed opacity-45')}
-      >
-        <Globe className={cn('size-3.5 shrink-0', (!installed || bloque) && 'text-fg-subtle')} />
-        <span className="max-w-28 truncate">{bloque ? 'Hors ligne' : 'Web'}</span>
-      </Chip>
-    </Tooltip>
+    <WebSearchToggle
+      on={!!conv.webSearch}
+      onToggle={() => void updateConversation(conv.id, { webSearch: !conv.webSearch })}
+    />
   )
 }
 

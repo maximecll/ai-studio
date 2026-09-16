@@ -15,6 +15,7 @@ import { ImageControls, ModeToggle, useImageEngine } from '../chat/ImageControls
 import { useAttachments } from '../../lib/attachments'
 import { PendingStrip } from '../chat/Attachments'
 import { MetalSend } from '../chat/MetalSend'
+import { WebSearchToggle } from '../chat/WebSearchToggle'
 import { useUI } from '../../store/ui'
 import { Button, Chip, Menu, MenuItem, MenuLabel, MorphButton, Tooltip } from '../ui/primitives'
 
@@ -51,6 +52,8 @@ export function HomeView() {
   const [mode, setMode] = useState<'text' | 'image'>('text')
   const image = mode === 'image' && hasImageModel
   const [preset, setPreset] = useState<Preset | null>(null)
+  /* Choisi ici, appliqué à la conversation dès sa naissance. */
+  const [webSearch, setWebSearch] = useState(false)
   const ref = useRef<HTMLTextAreaElement>(null)
   const { inspectorOpen, toggleInspector } = useUI()
 
@@ -83,7 +86,10 @@ export function HomeView() {
       ...settings.defaultParams,
       num_ctx: settings.defaultParams.num_ctx ?? suggestedContext(chosen),
     }
-    const id = await createConversation({ model, params, system: settings.defaultSystem })
+    const id = await createConversation({
+      model, params, system: settings.defaultSystem,
+      ...(webSearch ? { webSearch: true } : {}),
+    })
     if (preset) {
       await updateConversation(id, {
         presetId: preset.id,
@@ -214,6 +220,8 @@ export function HomeView() {
                   </MenuItem>
                 ))}
               </Menu>
+
+              <WebSearchToggle on={webSearch} onToggle={() => setWebSearch((v) => !v)} />
                 </>
               )}
               </div>
