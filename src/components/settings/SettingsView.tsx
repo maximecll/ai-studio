@@ -10,6 +10,7 @@ import { useModels } from '../../store/models'
 import { toast } from '../../store/ui'
 import { Page } from '../layout/Page'
 import { UpdateSettings } from './UpdateSettings'
+import { WebSearchSettings } from './WebSearchSettings'
 import { Button, ConfirmModal, Dropdown, Field, Input, Switch, Textarea } from '../ui/primitives'
 
 const TRANSCRIPTS: Array<{ value: Transcript; label: string }> = [
@@ -140,9 +141,9 @@ export function SettingsView() {
             <Dropdown
               value={settings.defaultModel}
               onChange={(v) => void patchSettings({ defaultModel: v })}
-              placeholder="— Aucun —"
+              placeholder="Aucun"
               options={[
-                { value: '', label: '— Aucun —' },
+                { value: '', label: 'Aucun' },
                 ...models.map((m) => ({ value: m.name, label: prettyModel(m.name), hint: m.details?.parameter_size })),
               ]}
             />
@@ -169,6 +170,10 @@ export function SettingsView() {
               </p>
             )}
           </Field>
+        </Group>
+
+        <Group title="Recherche web">
+          <WebSearchSettings />
         </Group>
 
         <Group title="Mises à jour">

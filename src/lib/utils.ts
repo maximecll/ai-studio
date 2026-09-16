@@ -17,7 +17,7 @@ export const isSecureContextAvailable =
   typeof window !== 'undefined' && window.isSecureContext && !!crypto.subtle
 
 export function formatBytes(n?: number): string {
-  if (!n) return '—'
+  if (!n) return '-'
   const u = ['o', 'Ko', 'Mo', 'Go', 'To']
   let i = 0
   let v = n
@@ -31,13 +31,13 @@ export function formatNumber(n: number): string {
 
 /** Nanosecondes (Ollama) → « 1,4 s » / « 320 ms ». */
 export function formatNs(ns?: number): string {
-  if (!ns) return '—'
+  if (!ns) return '-'
   const ms = ns / 1e6
   return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(ms < 10000 ? 2 : 1)} s`
 }
 
 export function formatMs(ms?: number): string {
-  if (ms === undefined) return '—'
+  if (ms === undefined) return '-'
   if (ms < 1000) return `${Math.round(ms)} ms`
   // Au-delà de la minute, le centième de seconde n'apprend plus rien.
   if (ms < 60_000) return `${(ms / 1000).toFixed(2)} s`
@@ -126,14 +126,14 @@ export function splitThinking(raw: string): { thinking: string; content: string;
   return { thinking: s.slice(7, end), content: s.slice(end + 8).trimStart(), open: false }
 }
 
-/** « 14:32 » — heure courte, pour horodater messages et conversations. */
+/** « 14:32 », heure courte, pour horodater messages et conversations. */
 export function shortTime(ts: number): string {
   return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(ts)
 }
 
-/** « 2 min 30 s », « 45 s » — durée restante, jamais au-delà de l'heure. */
+/** « 2 min 30 s », « 45 s », durée restante, jamais au-delà de l'heure. */
 export function formatEta(seconds: number | null): string {
-  if (seconds === null || !Number.isFinite(seconds)) return '—'
+  if (seconds === null || !Number.isFinite(seconds)) return '-'
   const s = Math.max(0, Math.round(seconds))
   if (s < 60) return `${s} s`
   const m = Math.floor(s / 60)
@@ -143,11 +143,11 @@ export function formatEta(seconds: number | null): string {
 
 /** « 12,4 Mo/s » */
 export function formatRate(bytesPerSecond: number): string {
-  if (!bytesPerSecond || !Number.isFinite(bytesPerSecond)) return '—'
+  if (!bytesPerSecond || !Number.isFinite(bytesPerSecond)) return '-'
   return `${formatBytes(bytesPerSecond)}/s`
 }
 
-/** « 12,4 k » — nombre compact, lisible à toute échelle. */
+/** « 12,4 k », nombre compact, lisible à toute échelle. */
 export function formatCompact(n: number): string {
   if (n < 1000) return String(Math.round(n))
   if (n < 1_000_000) return `${(n / 1000).toFixed(n < 10_000 ? 1 : 0).replace('.', ',')} k`

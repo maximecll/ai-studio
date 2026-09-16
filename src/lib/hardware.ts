@@ -32,7 +32,7 @@ export interface Verdict {
   label: string
   /** Une ligne, tenue courte : l'info-bulle ne revient pas à la ligne. */
   tip: string
-  /** Ce qu'il faut comprendre — affiché dans la carte, pas en info-bulle. */
+  /** Ce qu'il faut comprendre, affiché dans la carte, pas en info-bulle. */
   detail: string
   need: number
 }
@@ -43,7 +43,7 @@ const MARGE = 0.9
 /**
  * Sans la forme du modèle, le cache d'attention est incalculable : on majore
  * les poids. Le facteur vient du rapport observé entre le transfert et
- * l'empreinte réelle sur les modèles installés — 1,45 à 1,70 selon le
+ * l'empreinte réelle sur les modèles installés, 1,45 à 1,70 selon le
  * contexte. Majorer moins reviendrait à promettre ce que la machine ne tient
  * pas, et à contredire le verdict affiché après installation.
  */

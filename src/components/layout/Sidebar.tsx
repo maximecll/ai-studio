@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
-  Boxes, Copy, Download, FileJson, Lock, LockOpen, MoreHorizontal, PanelLeft, Pencil, Pin,
+  Boxes, Copy, Download, FileJson, Library, Lock, LockOpen, MoreHorizontal, PanelLeft, Pencil, Pin,
   PinOff, Plus, Search, Settings as SettingsIcon, Sparkles, Trash2, X,
 } from 'lucide-react'
 import {
@@ -32,7 +32,7 @@ function StatusDot() {
   )
 }
 
-/** Ligne de navigation — hauteur 36px, rayon du palier « lignes ». */
+/** Ligne de navigation, hauteur 36px, rayon du palier « lignes ». */
 function NavRow({
   icon, label, active, onClick, trailing,
 }: { icon: React.ReactNode; label: string; active?: boolean; onClick: () => void; trailing?: React.ReactNode }) {
@@ -198,7 +198,7 @@ export function Sidebar() {
         wide ? 'shrink-0' : 'fixed inset-y-0 left-0 z-50 shadow-float',
       )}
     >
-      {/* En-tête — même hauteur que la barre du haut, à la ligne près */}
+      {/* En-tête, même hauteur que la barre du haut, à la ligne près */}
       <div className="flex h-14 shrink-0 items-center gap-2 px-3">
         <button
           onClick={() => navigate(href.home())}
@@ -298,6 +298,10 @@ export function Sidebar() {
           trailing={modelCount ? <span className="font-mono text-[11px] text-fg-subtle">{modelCount}</span> : undefined}
         />
         <NavRow icon={<Sparkles className="size-4" />} label="Presets" onClick={() => navigate(href.presets())} />
+        <NavRow
+          icon={<Library className="size-4" />} label="Connaissances" active={route.name === 'knowledge'}
+          onClick={() => navigate(href.knowledge())}
+        />
         <NavRow
           icon={vault.unlocked ? <LockOpen className="size-4" /> : <Lock className="size-4" />}
           label="Coffre"

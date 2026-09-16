@@ -12,6 +12,10 @@ dist/
 # depuis « Modèles » (≈ 2 Go de dépendances MLX).
 .venv-images/
 
+# Recherche web : environnement Python de l'instance SearXNG locale,
+# réinstallable depuis « Réglages ».
+.venv-searx/
+
 # Node.js récupéré par le lanceur quand la machine n'en a pas.
 # Se retélécharge tout seul ; ne doit jamais partir dans le dépôt.
 .runtime/

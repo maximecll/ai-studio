@@ -45,6 +45,12 @@ function maintenance(): PluginOption {
         const { handle } = await import('./server/update.mjs')
         await handle(req, res)
       })
+      // La recherche web pilote une instance SearXNG locale.
+      server.middlewares.use('/search', async (req, res) => {
+        // @ts-expect-error — module serveur en JavaScript, sans types
+        const { handle } = await import('./server/searx.mjs')
+        await handle(req, res)
+      })
     },
   }
 }

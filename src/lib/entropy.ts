@@ -21,7 +21,7 @@ export function tokenEntropy(top: Array<{ logprob: number }>): number {
 export interface Uncertainty {
   /** Entropie moyenne par jeton, en bits, sur la distribution top-k. */
   meanEntropy: number
-  /** Entropie maximale rencontrée — le moment où le modèle a le plus hésité. */
+  /** Entropie maximale rencontrée, le moment où le modèle a le plus hésité. */
   maxEntropy: number
   /** Perplexité : exp(−moyenne des log-probabilités des jetons retenus). */
   perplexity: number

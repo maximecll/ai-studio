@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Brain, Check, ChevronDown, Circle, Image as ImageIcon, Paperclip, Send, Square, TriangleAlert } from 'lucide-react'
+import { Brain, Check, ChevronDown, Circle, Image as ImageIcon, Library, Paperclip, Send, Square, TriangleAlert } from 'lucide-react'
 import { imageParamsOf, updateConversation } from '../../lib/db'
 import { usePresets } from '../../lib/hooks'
 import type { Conversation, ImageParams, Settings } from '../../lib/types'
@@ -8,14 +8,16 @@ import { hasCapability, prettyModel } from '../../lib/ollama'
 import { PresetGlyph } from '../../lib/preset-icons'
 import { findModel, useModels } from '../../store/models'
 import { useChat } from '../../store/chat'
+import { useKnowledge } from '../../store/knowledge'
 import { Button, Chip, Menu, MenuItem, MenuLabel, MenuSeparator, MorphButton, Tooltip } from '../ui/primitives'
 import { useAttachments } from '../../lib/attachments'
 import { PendingStrip } from './Attachments'
 import { MetalSend } from './MetalSend'
 import { href, navigate } from '../../lib/router'
 import { ImageControls, ModeToggle, useImageEngine } from './ImageControls'
+import { WebSearchToggle } from './WebSearchToggle'
 
-/** Sélecteur de modèle — placé là où l'on écrit, pas dans l'en-tête. */
+/** Sélecteur de modèle, placé là où l'on écrit, pas dans l'en-tête. */
 function ModelChip({ conv }: { conv: Conversation }) {
   const switchModel = useChat((s) => s.switchModel)
   const models = useModels((s) => s.models)
@@ -62,7 +64,60 @@ function ModelChip({ conv }: { conv: Conversation }) {
   )
 }
 
-/** Sélecteur de preset — même capsule, même hauteur, même graisse. */
+/** Sélecteur de preset, même capsule, même hauteur, même graisse. */
+function KnowledgeChip({ conv }: { conv: Conversation }) {
+  const bases = useKnowledge((s) => s.bases)
+  const refresh = useKnowledge((s) => s.refresh)
+  useEffect(() => { void refresh() }, [refresh])
+
+  const active = conv.knowledgeIds ?? []
+  if (!bases.length) return null
+
+  const toggle = (id: string) => {
+    const next = active.includes(id) ? active.filter((x) => x !== id) : [...active, id]
+    void updateConversation(conv.id, { knowledgeIds: next })
+  }
+  const n = active.filter((id) => bases.some((b) => b.id === id)).length
+
+  return (
+    <Menu
+      side="top"
+      width="w-64"
+      trigger={({ open }) => (
+        <Chip as="span" active={open || n > 0} className="min-w-0 shrink">
+          <Library className="size-3.5 shrink-0" />
+          <span className="max-w-28 truncate">{n > 0 ? `${n} base${n > 1 ? 's' : ''}` : 'Connaissances'}</span>
+          <ChevronDown className="size-3.5 shrink-0 text-fg-subtle" />
+        </Chip>
+      )}
+    >
+      <MenuLabel>Bases actives dans ce fil</MenuLabel>
+      {bases.map((b) => (
+        <MenuItem
+          key={b.id}
+          active={active.includes(b.id)}
+          icon={active.includes(b.id) ? <Check className="size-4 text-fg" /> : <Circle className="size-4" />}
+          onClick={() => toggle(b.id)}
+        >
+          {b.name}
+        </MenuItem>
+      ))}
+      <MenuSeparator />
+      <MenuItem onClick={() => navigate(href.knowledge())}>Gérer les connaissances…</MenuItem>
+    </Menu>
+  )
+}
+
+/** Bascule « Recherche web » du fil : l'état vit dans la conversation. */
+function WebSearchChip({ conv }: { conv: Conversation }) {
+  return (
+    <WebSearchToggle
+      on={!!conv.webSearch}
+      onToggle={() => void updateConversation(conv.id, { webSearch: !conv.webSearch })}
+    />
+  )
+}
+
 function PresetChip({ conv }: { conv: Conversation }) {
   const presets = usePresets()
   const current = presets.find((p) => p.id === conv.presetId)
@@ -129,7 +184,7 @@ export function useComposerMode(conversationId: string) {
  * Les emplacements nommés viennent du ChatComposer d'Astryx, sans la
  * bibliothèque : elle pesait un tiers du paquet et restylait toute
  * l'application. La jauge de contexte, elle, reste au pied près du bouton
- * d'envoi — la remonter en en-tête lui donnait une ligne pour rien et
+ * d'envoi, la remonter en en-tête lui donnait une ligne pour rien et
  * désaccordait le mode texte du mode image.
  */
 function ComposerShell({
@@ -183,7 +238,7 @@ export function Composer({
   usedTokens: number
   hasMemory: boolean
   onSend: (text: string, files: File[]) => void
-  /** Envoi en mode image — la description part vers le moteur de diffusion. */
+  /** Envoi en mode image, la description part vers le moteur de diffusion. */
   onGenerate: (prompt: string, params: ImageParams) => void
   generating: boolean
   onStop: () => void
@@ -284,6 +339,8 @@ export function Composer({
                 <>
                   <ModelChip conv={conversation} />
                   <PresetChip conv={conversation} />
+                  <KnowledgeChip conv={conversation} />
+                  <WebSearchChip conv={conversation} />
                   {hasMemory && (
                     <Tooltip label="Une mémoire résume les échanges anciens de cette conversation" side="top">
                       <span className="flex size-8 shrink-0 items-center justify-center rounded-full text-fg-subtle">
@@ -306,14 +363,14 @@ export function Composer({
                   hidden
                   onChange={(e) => { void jointes.add(e.target.files); e.target.value = '' }}
                 />
-                <Tooltip label="Joindre une image — ou la déposer ici, ou la coller" side="top">
+                <Tooltip label="Joindre une image, ou la déposer ici, ou la coller" side="top">
                   <Button size="icon-sm" onClick={() => fichierRef.current?.click()}>
                     <Paperclip className="size-4" />
                   </Button>
                 </Tooltip>
 
                 <Tooltip
-                  label={`${formatNumber(used)} jetons sur ${formatNumber(ctxMax)} — ${Math.round(filled * 100)} % du contexte`}
+                  label={`${formatNumber(used)} jetons sur ${formatNumber(ctxMax)}, ${Math.round(filled * 100)} % du contexte`}
                   side="top"
                 >
                   <span className="hidden items-center gap-2 pr-1 sm:flex">
@@ -355,7 +412,7 @@ export function Composer({
             aveugle ? (
               <p className="t-caption mt-2 flex items-start gap-2 px-1 text-caution">
                 <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-                {prettyModel(conversation.model ?? '')} ne lit pas les images — choisissez un modèle « vision ».
+                {prettyModel(conversation.model ?? '')} ne lit pas les images, choisissez un modèle « vision ».
               </p>
             ) : undefined
           }

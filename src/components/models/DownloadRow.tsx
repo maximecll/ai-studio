@@ -89,7 +89,7 @@ export function DownloadRow({ dl, compact }: { dl: Download; compact?: boolean }
             {running && <span>reste {formatEta(dl.eta)}</span>}
           </>
         ) : (
-          <span>{running ? 'Négociation avec le registre…' : '—'}</span>
+          <span>{running ? 'Négociation avec le registre…' : '-'}</span>
         )}
         {dl.error && <span className="text-negative">{dl.error}</span>}
       </div>

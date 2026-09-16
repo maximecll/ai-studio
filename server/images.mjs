@@ -6,8 +6,9 @@ import { arch, homedir, platform, totalmem } from 'node:os'
 import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
-import { download, PS_UTF8 } from './setup.mjs'
+import { PS_UTF8 } from './setup.mjs'
 import { attach, isRunning, start } from './tasks.mjs'
+import { ENV_UTF8, hostPython, installPython, RUNTIME, venvPython } from './python.mjs'
 import { promisify } from 'node:util'
 
 const execute = promisify(execFile)
@@ -21,22 +22,12 @@ const WORKER = join(ROOT, 'scripts', 'flux_worker.py')
 
 /** Environnement Python dédié : le moteur d'images n'a rien à faire ailleurs. */
 const VENV = process.env.STUDIO_IMAGES_VENV ?? join(ROOT, '.venv-images')
-
-/* Python embarqué, quand la machine n'en a pas. Les archives
-   `python-build-standalone` sont relogeables et se déplient sans installateur :
-   même principe que Node.js et Ollama. */
-const RUNTIME = join(ROOT, '.runtime')
-const PY_DIR = join(RUNTIME, 'python')
-const PY_TAG = '20260901'
-const PY_VERSION = '3.12.14'
-const PYTHON = platform() === 'win32'
-  ? join(VENV, 'Scripts', 'python.exe')
-  : join(VENV, 'bin', 'python')
+const PYTHON = venvPython(VENV)
 
 /** Les images fraîches attendent ici que l'interface vienne les chercher. */
 const STAGING = join(homedir(), '.studio', 'images')
 
-/** Bibliothèque de LoRAs — un simple dossier où l'on dépose des fichiers. */
+/** Bibliothèque de LoRAs, un simple dossier où l'on dépose des fichiers. */
 const LORAS = process.env.STUDIO_LORAS ?? join(homedir(), '.studio', 'loras')
 /** Au-delà, une image non récupérée est un déchet : l'onglet a été fermé. */
 const STALE_MS = 6 * 60 * 60 * 1000
@@ -180,7 +171,7 @@ const MODELS = [
     steps: { default: 20, min: 4, max: 40 },
     guidance: { default: 5, min: 1, max: 10 },
     // Mesuré : 4,5 s par pas à 768². Le débruitage est six fois plus rapide
-    // que FLUX — la séquence latente ne fait que 576 jetons contre 2 304.
+    // que FLUX, la séquence latente ne fait que 576 jetons contre 2 304.
     msPerStep768: 4_500,
     // Mais l'encodeur UMT5-XXL coûte 124 s à charger, et le VAE 19 s à décoder :
     // un coût fixe bien plus lourd que celui de mflux, indépendant du nombre de pas.
@@ -214,7 +205,7 @@ const MODELS = [
     msPerStep768: 14_000,
     loadMs: 200_000,
     measured: false,
-    note: "Le grand modèle Wan, celui des LoRAs courants. Deux experts de 8,4 Go : au-delà de ce que 16 Go de mémoire peuvent tenir — à essayer, sans garantie.",
+    note: "Le grand modèle Wan, celui des LoRAs courants. Deux experts de 8,4 Go : au-delà de ce que 16 Go de mémoire peuvent tenir, à essayer, sans garantie.",
     heavy: true,
   },
   {
@@ -238,7 +229,7 @@ const MODELS = [
     msPerStep768: 30_000,
     loadMs: 20_000,
     measured: false,
-    note: "Quantification plus fine, donc plus fidèle — mais 18 Go de poids et un recours probable au disque sur 16 Go de mémoire.",
+    note: "Quantification plus fine, donc plus fidèle, mais 18 Go de poids et un recours probable au disque sur 16 Go de mémoire.",
     heavy: true,
   },
   {
@@ -403,7 +394,7 @@ function expertOf(meta, filename) {
   return undefined
 }
 
-/** Mot déclencheur, tel que les outils d'entraînement le rangent — au mieux. */
+/** Mot déclencheur, tel que les outils d'entraînement le rangent, au mieux. */
 function triggerOf(meta) {
   const direct = meta['modelspec.trigger_phrase'] ?? meta.ss_output_name
   try {
@@ -441,9 +432,9 @@ async function describeLora(name) {
     file: name,
     name: meta['modelspec.title'] || name.replace(/\.safetensors$/i, ''),
     bytes: size,
-    /* Ce que le fichier déclare — indicatif, et régulièrement faux. */
+    /* Ce que le fichier déclare, indicatif, et régulièrement faux. */
     architecture,
-    /* Ce que ses clés démontrent — fiable, c'est là-dessus qu'on tranche. */
+    /* Ce que ses clés démontrent, fiable, c'est là-dessus qu'on tranche. */
     target: targetOf(header),
     width: widthOf(header),
     rank: rankOf(meta, header),
@@ -536,16 +527,6 @@ export function engineInstalled() {
 }
 
 /** Lance le worker et transforme ses lignes NDJSON en appels à `onEvent`. */
-/** Sous Windows, les outils suivent la page de codes héritée s'ils ne sont pas
-    forcés : les accents ressortent alors illisibles. */
-const ENV_UTF8 = {
-  ...process.env,
-  PYTHONUNBUFFERED: '1',
-  PYTHONIOENCODING: 'utf-8',
-  // Mode UTF-8 complet : couvre aussi les chemins de fichiers accentués.
-  PYTHONUTF8: '1',
-}
-
 function runWorker(command, job, onEvent) {
   const child = spawn(PYTHON, [WORKER, command], {
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -601,76 +582,7 @@ const pulls = new Map()
 
 /* ── Installation du moteur ──────────────────────────────────────── */
 
-function pythonCible() {
-  const a = arch() === 'arm64' ? 'aarch64' : 'x86_64'
-  switch (platform()) {
-    case 'win32': return `${a}-pc-windows-msvc`
-    case 'darwin': return `${a}-apple-darwin`
-    case 'linux': return `${a}-unknown-linux-gnu`
-    default: return null
-  }
-}
-
-function pythonEmbarque() {
-  const p = platform() === 'win32' ? join(PY_DIR, 'python.exe') : join(PY_DIR, 'bin', 'python3')
-  return existsSync(p) ? p : null
-}
-
-/** Interpréteur hôte : celui qu'on a déposé d'abord, celui du système ensuite. */
-async function hostPython() {
-  const embarque = pythonEmbarque()
-  if (embarque) return { cmd: embarque, prefixe: [], version: PY_VERSION }
-
-  const essais = platform() === 'win32'
-    ? [['py', ['-3']], ['python', []], ['python3', []]]
-    : [['python3', []], ['python', []]]
-  for (const [cmd, prefixe] of essais) {
-    try {
-      const { stdout } = await execute(cmd, [...prefixe, '-c', 'import sys;print("%d.%d"%sys.version_info[:2])'], { timeout: 10000 })
-      const [majeure, mineure] = stdout.trim().split('.').map(Number)
-      if (majeure === 3 && mineure >= 10) return { cmd, prefixe, version: stdout.trim() }
-    } catch { /* on essaie le suivant */ }
-  }
-  return null
-}
-
-/** Dépose un interpréteur complet dans `.runtime/python`, sans installateur
-    ni droit administrateur : c'est le seul moyen d'aller au bout sur une
-    machine qui n'a pas Python — le cas courant sous Windows. */
-async function installPython(send, log) {
-  const cible = pythonCible()
-  if (!cible) throw new Error(`Système non pris en charge pour Python : ${platform()} ${arch()}.`)
-
-  const nom = `cpython-${PY_VERSION}+${PY_TAG}-${cible}-install_only.tar.gz`
-  const url = `https://github.com/astral-sh/python-build-standalone/releases/download/${PY_TAG}/${nom}`
-  await mkdir(RUNTIME, { recursive: true })
-  const archive = join(RUNTIME, nom)
-
-  send({ type: 'phase', phase: 'install', label: `Téléchargement de Python ${PY_VERSION}` })
-  const t0 = Date.now()
-  await download(url, archive, (completed, total) => {
-    const speed = completed / Math.max(0.001, (Date.now() - t0) / 1000)
-    send({
-      type: 'progress',
-      phase: 'downloading',
-      completed,
-      total,
-      speed,
-      eta: speed > 1 && total ? (total - completed) / speed : null,
-    })
-  })
-
-  send({ type: 'phase', phase: 'install', label: 'Installation de Python' })
-  await rm(PY_DIR, { recursive: true, force: true })
-  // L'archive contient un dossier `python/` : on la déplie dans `.runtime`.
-  await execute('tar', ['-xzf', archive, '-C', RUNTIME], { timeout: 900000, maxBuffer: 8 << 20 })
-  await rm(archive, { force: true })
-
-  if (!pythonEmbarque()) throw new Error("L'archive Python ne contient pas l'interpréteur attendu.")
-  log(`Python ${PY_VERSION} déposé dans .runtime/python`)
-}
-
-/** Une carte NVIDIA change la roue PyTorch à installer — et tout le reste. */
+/** Une carte NVIDIA change la roue PyTorch à installer, et tout le reste. */
 async function hasNvidia() {
   try {
     await execute('nvidia-smi', ['-L'], { timeout: 8000 })
@@ -684,7 +596,7 @@ async function hasNvidia() {
  * Un échec d'écriture qui survit à la reconstruction de l'environnement n'est
  * plus un fichier verrouillé. Sous Windows, la cause courante est l'accès
  * contrôlé aux dossiers, qui protège `Documents` et refuse l'écriture aux
- * programmes qu'il ne connaît pas — sans que rien ne le dise clairement.
+ * programmes qu'il ne connaît pas, sans que rien ne le dise clairement.
  */
 async function expliquerPip(tail) {
   const brut = tail.slice(-300)
@@ -778,7 +690,7 @@ function pipInstall(send) {
          fichier d'un essai précédent est encore verrouillé, ou à moitié
          écrit. Refaire l'environnement coûte moins cher que d'expliquer. */
       if (pip.code !== 0 && VERROUILLE.test(pip.tail)) {
-        send({ type: 'log', line: 'Environnement abîmé par un essai précédent — reconstruction.' })
+        send({ type: 'log', line: 'Environnement abîmé par un essai précédent, reconstruction.' })
         await rm(VENV, { recursive: true, force: true })
         const hote = await hostPython()
         const neuf = await run(hote.cmd, [...hote.prefixe, '-m', 'venv', VENV], "Reconstruction de l'environnement")
@@ -921,7 +833,7 @@ async function status(res) {
 }
 
 /** Détachée de la requête : rafraîchir la page n'interrompt rien.
-    `fresh` jette l'environnement avant de repartir — ce qu'il faut après une
+    `fresh` jette l'environnement avant de repartir, ce qu'il faut après une
     installation coupée au milieu. */
 async function install(req, res) {
   const { fresh } = await readBody(req).catch(() => ({}))

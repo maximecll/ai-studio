@@ -27,12 +27,12 @@ export interface Job {
   /** Pas déjà franchis. */
   step: number
   startedAt: number
-  /** Durée moyenne d'un pas, lissée — sert à estimer la fin. */
+  /** Durée moyenne d'un pas, lissée, sert à estimer la fin. */
   stepMs: number
   /** URL de l'image finie. */
   src?: string
   blobId?: string
-  /** Guidage effectivement appliqué — nul sur un modèle distillé. */
+  /** Guidage effectivement appliqué, nul sur un modèle distillé. */
   guidance?: number
   /** LoRAs transmis au moteur pour cette tâche. */
   applied?: LoraChoice[]
@@ -56,7 +56,7 @@ interface State {
   library: LoraFile[]
   loraFolder: string
   refreshLoras: () => Promise<void>
-  /** Vrai tant que le premier état n'est pas revenu — à distinguer d'un moteur absent. */
+  /** Vrai tant que le premier état n'est pas revenu, à distinguer d'un moteur absent. */
   probing: boolean
   jobs: Record<string, Job>
   pulls: Record<string, Pull>
@@ -487,7 +487,7 @@ async function apprendreDuree(
 
   /* Le chargement, lui, ne se moyenne pas : relire le modèle depuis le disque
      coûte vingt secondes, le relire depuis le cache du système en coûte trois.
-     On retient le pire, qu'on laisse redescendre lentement — sous-estimer est
+     On retient le pire, qu'on laisse redescendre lentement, sous-estimer est
      la seule erreur qui se remarque. */
   const charge2 = Math.max(releve.loadMs, (connu?.loadMs ?? 0) * 0.9)
 
@@ -509,7 +509,7 @@ export function jobCaption(job: Job): string {
   return job.label
 }
 
-/** Réglages de diffusion effectifs — ceux de la conversation, sinon ceux par défaut. */
+/** Réglages de diffusion effectifs, ceux de la conversation, sinon ceux par défaut. */
 export async function currentImageParams(): Promise<ImageParams> {
   return (await getSettings()).imageParams
 }

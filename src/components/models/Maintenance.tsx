@@ -62,7 +62,7 @@ export function Maintenance() {
         <div className="min-w-0">
           <h2 className="t-section">Entretien du magasin</h2>
           <p className="t-meta mt-1 text-fg-muted">
-            {bits.join(' et ')} — <span className="font-bold text-fg">{formatBytes(plan.reclaimable)}</span> récupérables.
+            {bits.join(' et ')}, <span className="font-bold text-fg">{formatBytes(plan.reclaimable)}</span> récupérables.
           </p>
           <p className="t-caption mt-2 text-fg-subtle">
             Ces fichiers ne servent à aucun modèle installé. Les {formatBytes(plan.inUse)} en service

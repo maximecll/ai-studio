@@ -36,7 +36,7 @@ export function useImageURL(blobId: string | undefined): string | null {
   return url
 }
 
-/** `undefined` tant que la base n'a pas répondu — à distinguer d'une base vide. */
+/** `undefined` tant que la base n'a pas répondu, à distinguer d'une base vide. */
 export function useConversations(): Conversation[] | undefined {
   const unlocked = useVault((s) => s.unlocked)
   return useLiveQuery(
@@ -105,6 +105,24 @@ export function useMediaQuery(query: string): boolean {
     return () => mq.removeEventListener('change', on)
   }, [query])
   return match
+}
+
+/** Connexion Internet de la machine. `navigator.onLine` passe à faux dès que
+    le système perd le réseau, de quoi bloquer la recherche web, qui a besoin
+    d'Internet pour interroger les moteurs. */
+export function useOnline(): boolean {
+  const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine)
+  useEffect(() => {
+    const on = () => setOnline(true)
+    const off = () => setOnline(false)
+    window.addEventListener('online', on)
+    window.addEventListener('offline', off)
+    return () => {
+      window.removeEventListener('online', on)
+      window.removeEventListener('offline', off)
+    }
+  }, [])
+  return online
 }
 
 export interface SystemMemory {

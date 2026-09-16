@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Conversation, Folder, ImageBlob, ImageParams, Message, Params, Preset, Settings } from './types'
+import type { Chunk, Conversation, Folder, ImageBlob, ImageParams, KnowledgeBase, Message, Params, Preset, Settings } from './types'
 import type { Vault } from './crypto'
 import { fullDate, uid } from './utils'
 import { hasMaster, openConversation, openImage, openMessage, sealConversation, sealImage, sealMessage, setMaster } from './sealed'
@@ -13,6 +13,8 @@ class StudioDB extends Dexie {
   settings!: EntityTable<Settings, 'id'>
   vault!: EntityTable<Vault, 'id'>
   images!: EntityTable<ImageBlob, 'id'>
+  knowledge!: EntityTable<KnowledgeBase, 'id'>
+  chunks!: EntityTable<Chunk, 'id'>
 
   constructor() {
     super('ollama-studio')
@@ -84,6 +86,19 @@ class StudioDB extends Dexie {
         if (s.keepAlive === '-1') s.keepAlive = '1h'
       }),
     )
+
+    // v8 : bases de connaissances (RAG) et leurs morceaux vectorisés.
+    this.version(8).stores({
+      conversations: 'id, updatedAt, createdAt, pinned, folderId, archived, locked, *tags',
+      messages: 'id, conversationId, createdAt, [conversationId+createdAt]',
+      presets: 'id, name, createdAt',
+      folders: 'id, order, name',
+      settings: 'id',
+      vault: 'id',
+      images: 'id, conversationId, createdAt',
+      knowledge: 'id, name, createdAt',
+      chunks: 'id, knowledgeId, docId',
+    })
   }
 }
 
@@ -340,7 +355,7 @@ export async function deleteImage(id: string): Promise<void> {
   await db.images.delete(id)
 }
 
-/** Octets occupés par les images — pour le panneau de stockage. */
+/** Octets occupés par les images, pour le panneau de stockage. */
 export async function imagesWeight(): Promise<{ count: number; bytes: number }> {
   let bytes = 0
   let count = 0
@@ -354,7 +369,7 @@ export async function messagesOf(conversationId: string): Promise<Message[]> {
   return Promise.all(raw.map(openMessage))
 }
 
-/** Lecture brute, sans déchiffrement — pour les manipulations de structure. */
+/** Lecture brute, sans déchiffrement, pour les manipulations de structure. */
 export function rawMessagesOf(conversationId: string): Promise<Message[]> {
   return db.messages.where('conversationId').equals(conversationId).sortBy('createdAt')
 }
@@ -386,7 +401,7 @@ export async function deleteMessage(id: string): Promise<void> {
   await db.messages.delete(id)
 }
 
-/** Supprime tout ce qui suit un message — utilisé pour régénérer / éditer. */
+/** Supprime tout ce qui suit un message, utilisé pour régénérer / éditer. */
 export async function deleteMessagesFrom(conversationId: string, createdAt: number, inclusive = false): Promise<void> {
   const all = await messagesOf(conversationId)
   const doomed = all.filter((m) => (inclusive ? m.createdAt >= createdAt : m.createdAt > createdAt))

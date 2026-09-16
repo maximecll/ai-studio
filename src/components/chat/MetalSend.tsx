@@ -6,7 +6,7 @@ import { MetalFx, useMetalBend } from 'metal-fx'
  *
  * `metal-fx` peint un anneau de métal liquide et un halo autour de l'élément
  * qu'il enveloppe, en WebGL2 ; sans WebGL2 il rend l'enfant tel quel. Aucune
- * dépendance, et un seul bouton couvert — rien à voir avec un nuanceur plein
+ * dépendance, et un seul bouton couvert, rien à voir avec un nuanceur plein
  * cadre.
  */
 export function MetalSend({ children, muted = false }: { children: React.ReactNode; muted?: boolean }) {

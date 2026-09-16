@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { ollama, OllamaError } from '../lib/ollama'
 import { imagesOf, storeAttachments } from '../lib/attachments'
+import { contextBlock, retrieve } from '../lib/rag'
+import { webContextBlock, webSearch } from '../lib/websearch'
 import {
   addMessage, db, deleteMessagesFrom, getSettings, messagesOf, updateConversation, updateMessage,
 } from '../lib/db'
@@ -17,10 +19,10 @@ export interface Stream {
   content: string
   thinking: string
   startedAt: number
-  /** Horodatage mural, figé au démarrage — pour l'affichage de l'heure. */
+  /** Horodatage mural, figé au démarrage, pour l'affichage de l'heure. */
   at: number
   ttft?: number
-  /** Jetons produits jusqu'ici — Ollama en émet un par fragment. */
+  /** Jetons produits jusqu'ici, Ollama en émet un par fragment. */
   tokens: number
   /** Jetons consommés par le raisonnement, comptés à part. */
   thinkingTokens: number
@@ -49,7 +51,7 @@ const controllers = new Map<string, AbortController>()
 const FIRST_CHUNK_MS = 180_000 // le chargement d'un gros modèle peut être long
 const BETWEEN_CHUNKS_MS = 90_000
 
-/** Rang de la distribution observée pour l'entropie — le « 8 » de H₈. */
+/** Rang de la distribution observée pour l'entropie, le « 8 » de H₈. */
 export const TOP_LOGPROBS = 8
 
 export const useChat = create<ChatState>((set, get) => {
@@ -181,8 +183,30 @@ export const useChat = create<ChatState>((set, get) => {
 
     const payload: Array<Pick<Message, 'role' | 'content'> & { images?: string[] }> = []
 
+    /* RAG et recherche web : deux sources de contexte tirées de la dernière
+       question et glissées en tête. Une source indisponible ne bloque rien. */
+    const lastUser = [...history].reverse().find((m) => m.role === 'user' && !m.error && !m.folded)
+    let ragBlock = ''
+    if (conv.knowledgeIds?.length && lastUser?.content.trim()) {
+      try {
+        const passages = await retrieve(lastUser.content, conv.knowledgeIds)
+        if (passages.length) ragBlock = contextBlock(passages)
+      } catch { /* embeddings indisponibles : on répond sans contexte */ }
+    }
+
+    let webBlock = ''
+    // Hors ligne, la recherche est bloquée : SearXNG ne pourrait rien interroger.
+    if (conv.webSearch && navigator.onLine && lastUser?.content.trim()) {
+      try {
+        const results = await webSearch(lastUser.content)
+        if (results.length) webBlock = webContextBlock(results)
+      } catch { /* SearXNG injoignable : on répond sans le web */ }
+    }
+
     const preamble = [
       conv.system.trim(),
+      ragBlock,
+      webBlock,
       conv.memory.trim() ? memoryBlock(conv.memory) : '',
     ].filter(Boolean).join('\n\n')
     if (preamble) payload.push({ role: 'system', content: preamble })

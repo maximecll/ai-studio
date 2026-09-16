@@ -18,7 +18,7 @@ const ENTER = {
   transition: { type: 'spring' as const, stiffness: 380, damping: 32 },
 }
 
-/* ── Raisonnement — panneau inséré, sans barre de citation ────────── */
+/* ── Raisonnement, panneau inséré, sans barre de citation ────────── */
 
 function Thinking({
   text, live, defaultOpen, count = 0,
@@ -66,7 +66,7 @@ function Thinking({
   )
 }
 
-/* ── Mesures — alignées à gauche, sous la réponse du modèle ───────── */
+/* ── Mesures, alignées à gauche, sous la réponse du modèle ───────── */
 
 function Metric({ label, value, title, tone }: { label: string; value: string; title: string; tone?: string }) {
   return (
@@ -133,7 +133,7 @@ function Metrics({ m }: { m: Msg }) {
   )
 }
 
-/** Repli d'un contenu derrière un intitulé — utilisé par la vue « Réflexion ». */
+/** Repli d'un contenu derrière un intitulé, utilisé par la vue « Réflexion ». */
 function Disclosure({ label, children }: { label: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   return (
@@ -167,7 +167,7 @@ function Disclosure({ label, children }: { label: string; children: React.ReactN
   )
 }
 
-/* ── Message de l'utilisateur — à droite ──────────────────────────── */
+/* ── Message de l'utilisateur, à droite ──────────────────────────── */
 
 export const UserMessage = memo(function UserMessage({
   message, onEdit, onDelete, onRestart, disabled, faded,
@@ -257,7 +257,7 @@ export const UserMessage = memo(function UserMessage({
   )
 })
 
-/* ── Message du modèle — à gauche ─────────────────────────────────── */
+/* ── Message du modèle, à gauche ─────────────────────────────────── */
 
 function ModelLabel({ model, at }: { model?: string; at: number }) {
   return (

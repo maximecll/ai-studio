@@ -11,14 +11,14 @@ export const COMPACT_THRESHOLD = 0.72
 /** Nombre de messages récents toujours transmis mot pour mot. */
 export const KEEP_VERBATIM = 6
 
-const TEMPLATE = MEMORY_SECTIONS.map((s) => `## ${s}\n—`).join('\n\n')
+const TEMPLATE = MEMORY_SECTIONS.map((s) => `## ${s}`).join('\n\n')
 
 export function emptyMemory(): string {
   return TEMPLATE
 }
 
 export function isEmptyMemory(memo: string): boolean {
-  return !memo.trim() || memo.replace(/##[^\n]*\n?|—|\s/g, '') === ''
+  return !memo.trim() || memo.replace(/##[^\n]*\n?|\s/g, '') === ''
 }
 
 /** Bloc injecté en tête de contexte, juste après les instructions système. */
@@ -47,7 +47,7 @@ function buildPrompt(memo: string, older: Message[]): string {
     '',
     'Règles :',
     `- Garde exactement ces sections, dans cet ordre : ${MEMORY_SECTIONS.map((s) => `## ${s}`).join(', ')}.`,
-    '- Une section sans contenu prend un tiret cadratin (—).',
+    '- Laisse une section sans contenu vide, sous son seul titre.',
     '- Des puces courtes, factuelles, au présent. 200 mots au total au maximum.',
     "- N'invente rien. Ne recopie pas le dialogue : retiens ce qui reste vrai ensuite.",
     '- Conserve noms propres, chiffres, chemins de fichiers et décisions arrêtées.',
@@ -117,7 +117,7 @@ export async function rewriteMemory(
 ): Promise<string> {
   const prompt = buildPrompt(memo || emptyMemory(), older)
 
-  /** Sans fenêtre explicite, Ollama charge le modèle avec sa valeur par défaut — 4096 — et tronque tout ce qui dépasse, en n'en avertissant que dans son… */
+  /** Sans fenêtre explicite, Ollama charge le modèle avec sa valeur par défaut (4096) et tronque tout ce qui dépasse, en n'en avertissant que dans son… */
   const needed = estimateTokens(prompt) + MEMO_PREDICT + 512
   const window = Math.min(CONTEXT_CAP, Math.max(numCtx ?? 0, needed))
 

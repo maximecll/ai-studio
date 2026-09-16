@@ -104,7 +104,7 @@ export const useVault = create<VaultState>((set, get) => {
       }
     },
 
-    /** Repousse la fermeture automatique — appelé à chaque interaction utile. */
+    /** Repousse la fermeture automatique, appelé à chaque interaction utile. */
     touch() {
       if (get().unlocked) armIdle()
     },

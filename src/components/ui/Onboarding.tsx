@@ -17,7 +17,7 @@ const STEPS: Step[] = [
   {
     icon: <MessageSquare className="size-5" />,
     title: 'Vos conversations restent ici',
-    body: "Tout vit dans ce navigateur et l'inférence tourne sur votre machine. Aucun serveur, aucun compte, aucune télémétrie — et ça fonctionne sans connexion.",
+    body: "Tout vit dans ce navigateur et l'inférence tourne sur votre machine. Aucun serveur, aucun compte, aucune télémétrie, et ça fonctionne sans connexion.",
   },
   {
     icon: <Boxes className="size-5" />,

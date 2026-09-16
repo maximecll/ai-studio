@@ -129,7 +129,7 @@
   .scroll-thin::-webkit-scrollbar-track { background: transparent; }
 }
 
-/* ── Échelle typographique — la seule autorisée ──────────────────── */
+/* ── Échelle typographique, la seule autorisée ──────────────────── */
 /* Le suivi se resserre à mesure que la taille grandit, par pas réguliers. */
 .t-display { font-size: 32px; line-height: 1.18; letter-spacing: -0.030em; font-weight: 700; }
 .t-title   { font-size: 22px; line-height: 1.32; letter-spacing: -0.022em; font-weight: 700; }
@@ -140,7 +140,7 @@
 .t-caption { font-size: 12px; line-height: 1.42; letter-spacing: -0.003em; font-weight: 500; }
 .t-label   { font-size: 11px; line-height: 1.4;  letter-spacing: 0.09em; font-weight: 700; text-transform: uppercase; }
 
-/* ── Markdown — de la prose, pas du chrome ───────────────────────── */
+/* ── Markdown, de la prose, pas du chrome ───────────────────────── */
 .md { font-size: 15px; line-height: 1.68; letter-spacing: -0.011em; font-weight: 500; overflow-wrap: anywhere; }
 .md > * + * { margin-top: 14px; }
 .md h1, .md h2, .md h3, .md h4 { font-weight: 700; line-height: 1.35; letter-spacing: -0.02em; }
@@ -194,7 +194,7 @@
 .md td code { white-space: nowrap; }
 .md img { border-radius: 18px; }
 
-/* ── Coloration syntaxique — dérivée de la palette, jamais criarde ─ */
+/* ── Coloration syntaxique, dérivée de la palette, jamais criarde ─ */
 .hljs-comment, .hljs-quote { color: var(--fg-subtle); font-style: italic; }
 .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-type { color: var(--accent-ink); font-weight: 700; }
 .hljs-string, .hljs-regexp, .hljs-addition { color: var(--positive); }

@@ -76,7 +76,22 @@ export async function openImage(row: ImageBlob): Promise<Blob | null> {
   return new Blob([bytes as BlobPart], { type: row.type })
 }
 
-/** Vrai si le contenu est illisible en l'état — coffre fermé. */
+/* ── Connaissances ────────────────────────────────────────────────── */
+
+/** Chiffre le texte d'un morceau si sa base est verrouillée. */
+export async function sealChunkText(text: string, sealedBase: boolean): Promise<string> {
+  if (!sealedBase || !master) return text
+  return isSealed(text) ? text : sealText(master, text)
+}
+
+/** Rend le texte en clair, ou `null` si chiffré et coffre fermé. */
+export async function openChunkText(text: string): Promise<string | null> {
+  if (!isSealed(text)) return text
+  if (!master) return null
+  return openText(master, text)
+}
+
+/** Vrai si le contenu est illisible en l'état, coffre fermé. */
 export function isOpaque(msg: Message): boolean {
   return isSealed(msg.content) && !master
 }
