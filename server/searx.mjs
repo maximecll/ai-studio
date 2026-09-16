@@ -239,15 +239,17 @@ function installer() {
           //    Le dépôt versionne des gabarits de déploiement dont le nom
           //    contient « : » (ex. utils/.../searxng.conf:socket), interdit
           //    sous Windows : leur écriture dans l'arbre de travail échoue.
-          //    On ne matérialise donc que le paquet Python (searx/) et les
-          //    fichiers racine — tout ce dont pip a besoin, jamais utils/.
+          //    Ces fichiers vivent tous sous utils/, dont pip n'a aucun besoin.
+          //    On clone sans arbre de travail, puis on matérialise tout SAUF
+          //    utils/ via un pathspec explicite — robuste quelle que soit la
+          //    version de git (le sparse-checkout, lui, ne restreignait pas la
+          //    copie sur certaines versions de Windows).
           const git = gitBin()
           await rm(SRC, { recursive: true, force: true })
           await mkdir(RUNTIME, { recursive: true })
           const gitEtapes = [
             [['clone', '--depth', '1', '--no-checkout', REPO, SRC], 'Téléchargement de SearXNG'],
-            [['-C', SRC, 'sparse-checkout', 'set', '--cone', 'searx'], null],
-            [['-C', SRC, 'checkout'], null],
+            [['-C', SRC, 'checkout', 'HEAD', '--', '.', ':(exclude)utils'], null],
           ]
           for (const [args, label] of gitEtapes) {
             const r = await run(git, args, label)
