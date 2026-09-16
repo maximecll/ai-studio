@@ -355,6 +355,8 @@ export interface KnowledgeBase {
   name: string
   /** Modèle d'embedding utilisé — un vecteur n'est comparable qu'aux siens. */
   embedModel: string
+  /** Chiffrée : le texte des morceaux est illisible coffre fermé. */
+  sealed: 0 | 1
   createdAt: number
   updatedAt: number
 }

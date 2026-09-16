@@ -51,7 +51,7 @@ Fermer la fenêtre du lanceur arrête le serveur et Ollama.
 | **Téléchargements** | Menés par le serveur : rafraîchir la page, changer d'écran ou fermer l'onglet n'interrompt rien, la progression se retrouve au retour. |
 | **Modèles** | Recherche Hugging Face (GGUF) et bibliothèque Ollama, qui propose le plus capable de chaque famille que la carte peut porter. Téléchargement avec débit et temps restant, annulable. Chaque quantisation dit si elle tient. |
 | **Pièces jointes** | Images déposées, collées ou choisies, lues par les modèles `vision`. Badge cliquable sous le message. |
-| **Connaissances (RAG)** | Déposez vos documents ; l'app les vectorise en local et le modèle s'appuie dessus, citant ses sources. Activable par conversation. |
+| **Connaissances (RAG)** | Déposez vos documents — **PDF** compris ; l'app les vectorise en local et le modèle s'appuie dessus, citant ses sources. Base **chiffrable** au repos. Activable par conversation. |
 | **Images** | Génération locale, dans le fil de conversation. Moteur et modèles selon la machine. Mosaïque WebGL pendant le calcul, qui se dissout vers l'image. |
 | **Chiffrement** | Conversations verrouillables, AES-GCM au repos. |
 | **Mesures** | Entropie par jeton, perplexité, confiance, débit, latence, contexte. |
@@ -59,9 +59,9 @@ Fermer la fenêtre du lanceur arrête le serveur et Ollama.
 
 ### Connaissances (RAG)
 
-Une page **Connaissances** où vous déposez des fichiers texte (Markdown, code, `.txt`, JSON, CSV…). AI Studio les découpe, calcule un vecteur par morceau avec le modèle d'embedding `nomic-embed-text`, et range le tout dans le navigateur. À chaque question, il retrouve les passages les plus proches et les glisse en tête du prompt — le modèle répond en s'appuyant dessus et cite ses sources.
+Une page **Connaissances** où vous déposez vos fichiers — **PDF**, Markdown, code, `.txt`, JSON, CSV… AI Studio les découpe, calcule un vecteur par morceau avec le modèle d'embedding `nomic-embed-text`, et range le tout dans le navigateur. À chaque question, il retrouve les passages les plus proches et les glisse en tête du prompt — le modèle répond en s'appuyant dessus et cite ses sources.
 
-Une base s'active par conversation, comme un preset. Tout se fait en local : découpage, vecteurs, recherche. Le PDF viendra ; pour l'instant, formats texte.
+Une base s'active par conversation, comme un preset. Tout se fait en local : découpage, vecteurs, recherche. Une base peut être **chiffrée** : le texte des morceaux est scellé en AES-GCM et n'est lisible — pour indexer comme pour répondre — que le coffre ouvert. Les vecteurs, eux, restent en clair : ils servent à la recherche sans permettre de reconstituer le texte.
 
 ### Compatibilité des modèles
 

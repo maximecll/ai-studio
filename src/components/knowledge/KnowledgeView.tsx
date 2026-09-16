@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { FileText, FolderOpen, Layers, Loader2, Plus, Trash2, Upload } from 'lucide-react'
+import { FileText, FolderOpen, Layers, Loader2, Lock, Plus, Trash2, Upload } from 'lucide-react'
 import { db } from '../../lib/db'
 import { DEFAULT_EMBED_MODEL } from '../../lib/rag'
 import type { Chunk, KnowledgeBase } from '../../lib/types'
 import { useModels } from '../../store/models'
 import { useKnowledge } from '../../store/knowledge'
+import { useVault } from '../../store/vault'
+import { toast } from '../../store/ui'
 import { Page } from '../layout/Page'
 import { Button, ConfirmModal, Input } from '../ui/primitives'
 import { cn } from '../../lib/utils'
@@ -45,7 +47,9 @@ function BaseCard({ base }: { base: KnowledgeBase }) {
   return (
     <section className="overflow-hidden rounded-lg bg-surface shadow-card">
       <header className="flex items-center gap-3 px-5 py-3.5">
-        <Layers className="size-4 shrink-0 text-fg-subtle" />
+        {base.sealed
+          ? <Lock className="size-4 shrink-0 text-positive" />
+          : <Layers className="size-4 shrink-0 text-fg-subtle" />}
         <input
           defaultValue={base.name}
           onBlur={(e) => { if (e.target.value.trim() !== base.name) void rename(base.id, e.target.value) }}
@@ -86,7 +90,7 @@ function BaseCard({ base }: { base: KnowledgeBase }) {
           onDrop={(e) => { e.preventDefault(); void addFiles(base.id, [...e.dataTransfer.files]) }}
         >
           <p className="t-meta text-fg-muted">
-            Déposez des fichiers texte ici (Markdown, code, <span className="font-mono">.txt</span>, JSON, CSV…).
+            Déposez des fichiers ici — <span className="font-mono">PDF</span>, Markdown, code, <span className="font-mono">.txt</span>, JSON, CSV…
             Ils sont découpés et vectorisés en local, puis le modèle s’appuiera dessus quand la base est activée
             dans une conversation.
           </p>
@@ -139,7 +143,9 @@ export function KnowledgeView() {
   const refresh = useKnowledge((s) => s.refresh)
   const create = useKnowledge((s) => s.create)
   const models = useModels((s) => s.models)
+  const vaultUnlocked = useVault((s) => s.unlocked)
   const [name, setName] = useState('')
+  const [chiffrer, setChiffrer] = useState(false)
 
   useEffect(() => { void refresh() }, [refresh])
 
@@ -148,8 +154,12 @@ export function KnowledgeView() {
   const ajouter = async () => {
     const n = name.trim()
     if (!n) return
+    if (chiffrer && !vaultUnlocked) {
+      toast({ title: 'Coffre fermé', description: 'Ouvrez le coffre (barre latérale) pour créer une base chiffrée.', tone: 'danger' })
+      return
+    }
     setName('')
-    await create(n)
+    await create(n, chiffrer)
   }
 
   return (
@@ -165,14 +175,25 @@ export function KnowledgeView() {
         </p>
       )}
 
-      <div className="mb-6 flex items-center gap-2">
+      <div className="mb-6 flex flex-wrap items-center gap-2">
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void ajouter() }}
           placeholder="Nom d’une nouvelle base — ex. « Doc React », « Mon code »"
-          className="flex-1"
+          className="min-w-56 flex-1"
         />
+        <button
+          onClick={() => setChiffrer((v) => !v)}
+          title="Chiffre le texte des documents ; illisible coffre fermé"
+          className={cn(
+            'flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-full border px-3.5 text-[13px] transition-colors',
+            chiffrer ? 'border-transparent bg-positive-wash text-positive' : 'border-line text-fg-muted hover:bg-fg/[0.04]',
+          )}
+        >
+          <Lock className="size-3.5" />
+          Chiffrer
+        </button>
         <Button variant="primary" size="sm" onClick={() => void ajouter()} disabled={!name.trim()}>
           <Plus className="size-4" />
           Créer
@@ -195,7 +216,7 @@ export function KnowledgeView() {
 
       <p className="t-caption mt-6 text-fg-subtle">
         Tout reste sur la machine : le découpage, les vecteurs et la recherche se font en local.
-        Formats texte pour l’instant (Markdown, code, txt, JSON, CSV) — le PDF viendra.
+        PDF, Markdown, code, txt, JSON, CSV. Une base chiffrée n’est lisible que le coffre ouvert.
       </p>
     </Page>
   )

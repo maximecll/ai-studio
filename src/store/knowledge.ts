@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { db } from '../lib/db'
 import { chunkText, DEFAULT_EMBED_MODEL, embedBatch } from '../lib/rag'
 import { uid } from '../lib/utils'
+import { extractText, isPdf } from '../lib/extract'
+import { hasMaster, sealChunkText } from '../lib/sealed'
 import type { KnowledgeBase } from '../lib/types'
 import { toast } from './ui'
 
@@ -9,7 +11,7 @@ import { toast } from './ui'
 const TEXTE = /\.(txt|md|markdown|mdx|rst|log|csv|tsv|json|ya?ml|toml|ini|cfg|conf|html?|xml|svg|tex|js|jsx|ts|tsx|py|rb|go|rs|java|kt|c|h|cpp|cc|hpp|cs|php|swift|sh|bash|zsh|sql|css|scss|vue|astro|dockerfile)$/i
 
 function indexable(file: File): boolean {
-  return file.type.startsWith('text/') || TEXTE.test(file.name) || file.type === 'application/json'
+  return isPdf(file) || file.type.startsWith('text/') || TEXTE.test(file.name) || file.type === 'application/json'
 }
 
 export interface Indexing {
@@ -29,7 +31,7 @@ interface KnowledgeState {
   counts: Record<string, DocCount>
   indexing: Indexing | null
   refresh: () => Promise<void>
-  create: (name: string) => Promise<string>
+  create: (name: string, sealed?: boolean) => Promise<string>
   rename: (id: string, name: string) => Promise<void>
   remove: (id: string) => Promise<void>
   addFiles: (id: string, files: File[]) => Promise<void>
@@ -61,10 +63,13 @@ export const useKnowledge = create<KnowledgeState>((set, get) => ({
     set({ bases, counts: c })
   },
 
-  async create(name) {
+  async create(name, sealed = false) {
     const id = uid()
     const now = Date.now()
-    await db.knowledge.add({ id, name: name.trim() || 'Sans titre', embedModel: DEFAULT_EMBED_MODEL, createdAt: now, updatedAt: now })
+    await db.knowledge.add({
+      id, name: name.trim() || 'Sans titre', embedModel: DEFAULT_EMBED_MODEL,
+      sealed: sealed ? 1 : 0, createdAt: now, updatedAt: now,
+    })
     await get().refresh()
     return id
   },
@@ -86,10 +91,14 @@ export const useKnowledge = create<KnowledgeState>((set, get) => ({
   async addFiles(id, files) {
     const base = await db.knowledge.get(id)
     if (!base) return
+    if (base.sealed && !hasMaster()) {
+      toast({ title: 'Coffre fermé', description: 'Ouvrez le coffre pour indexer dans une base chiffrée.', tone: 'danger' })
+      return
+    }
     const bons = files.filter(indexable)
     const rejetes = files.length - bons.length
     if (rejetes > 0) {
-      toast({ title: 'Fichiers ignorés', description: `${rejetes} fichier(s) non textuel(s) — PDF et binaires pas encore pris en charge.`, tone: 'danger' })
+      toast({ title: 'Fichiers ignorés', description: `${rejetes} fichier(s) non pris en charge (images, binaires…).`, tone: 'danger' })
     }
     if (!bons.length) return
 
@@ -98,7 +107,7 @@ export const useKnowledge = create<KnowledgeState>((set, get) => ({
       for (let i = 0; i < bons.length; i++) {
         const file = bons[i]
         set({ indexing: { base: id, label: file.name, done: i, total: bons.length } })
-        const texte = await file.text()
+        const texte = await extractText(file)
         const morceaux = chunkText(texte)
         if (!morceaux.length) continue
 
@@ -116,12 +125,15 @@ export const useKnowledge = create<KnowledgeState>((set, get) => ({
 
         const docId = uid()
         const now = Date.now()
-        await db.chunks.bulkAdd(
-          morceaux.map((text, index) => ({
+        // Le texte du morceau est chiffré si la base l'est ; le vecteur reste
+        // en clair — il sert à la recherche et ne restitue pas le texte.
+        const rows = await Promise.all(
+          morceaux.map(async (text, index) => ({
             id: uid(), knowledgeId: id, docId, docName: file.name, index,
-            text, vector: vecteurs[index] ?? [], createdAt: now,
+            text: await sealChunkText(text, !!base.sealed), vector: vecteurs[index] ?? [], createdAt: now,
           })),
         )
+        await db.chunks.bulkAdd(rows)
       }
       await db.knowledge.update(id, { updatedAt: Date.now() })
       toast({ title: 'Documents indexés', description: base.name, tone: 'success' })

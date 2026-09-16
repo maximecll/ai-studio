@@ -2,6 +2,7 @@
 import { db } from './db'
 import { ollama } from './ollama'
 import type { Chunk } from './types'
+import { hasMaster, openChunkText } from './sealed'
 
 /** Modèle d'embedding par défaut : petit, rapide, déjà dans la bibliothèque. */
 export const DEFAULT_EMBED_MODEL = 'nomic-embed-text'
@@ -88,18 +89,30 @@ export async function retrieve(
   const [qVec] = await embedBatch(model, [query])
   if (!qVec) return []
 
+  // Une base chiffrée dont le coffre est fermé est illisible : on la saute.
+  const bases = await db.knowledge.bulkGet(knowledgeIds)
+  const scellees = new Set(bases.filter((b) => b?.sealed).map((b) => b!.id))
+
   const chunks: Chunk[] = []
   for (const id of knowledgeIds) {
+    if (scellees.has(id) && !hasMaster()) continue
     chunks.push(...(await db.chunks.where('knowledgeId').equals(id).toArray()))
   }
   if (!chunks.length) return []
 
-  return chunks
-    .map((c) => ({ text: c.text, docName: c.docName, score: produitScalaire(qVec, c.vector) }))
+  const meilleurs = chunks
+    .map((c) => ({ c, score: produitScalaire(qVec, c.vector) }))
     .sort((a, b) => b.score - a.score)
-    .slice(0, topK)
     // En deçà, le passage n'a rien à voir avec la question : mieux vaut rien.
-    .filter((p) => p.score > 0.35)
+    .filter((x) => x.score > 0.35)
+    .slice(0, topK)
+
+  const passages: Passage[] = []
+  for (const { c, score } of meilleurs) {
+    const text = await openChunkText(c.text)
+    if (text) passages.push({ text, docName: c.docName, score })
+  }
+  return passages
 }
 
 /** Bloc de contexte injecté en tête du prompt, avec les sources citées. */
